@@ -126,8 +126,8 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "path_follower");
     ros::NodeHandle n;
 
-    desired_heading_pub = n.advertise<marine_msgs::NavEulerStamped>("/moos/desired_heading",1);
-    desired_speed_pub = n.advertise<geometry_msgs::TwistStamped>("/moos/desired_speed",1);
+    desired_heading_pub = n.advertise<marine_msgs::NavEulerStamped>("/project11/desired_heading",1);
+    desired_speed_pub = n.advertise<geometry_msgs::TwistStamped>("/project11/desired_speed",1);
     setpoint_pub = n.advertise<std_msgs::Float64>("/project11/crab_angle/setpoint",1);
     state_pub = n.advertise<std_msgs::Float64>("/project11/crab_angle/state",1);
     
