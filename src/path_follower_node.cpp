@@ -62,7 +62,7 @@ void sendDesired()
         p1[1] = current_path[0].longitude;
         p2[0] = current_path[1].latitude;
         p2[1] = current_path[1].longitude;
-        std::cerr << "p1: " << p1[0] << "," << p1[1] << " p2: " << p2[0] << "," << p2[1] << std::endl;
+        //std::cerr << "p1: " << p1[0] << "," << p1[1] << " p2: " << p2[0] << "," << p2[1] << std::endl;
         
         vehicle_position[0] = current_position.latitude;
         vehicle_position[1] = current_position.longitude;
@@ -70,14 +70,14 @@ void sendDesired()
         auto path_azimuth_distance = gz4d::geo::WGS84::Ellipsoid::inverse(p1,p2);
         auto vehicle_azimuth_distance = gz4d::geo::WGS84::Ellipsoid::inverse(p1,vehicle_position);
 
-        std::cerr << "path azimuth: " << path_azimuth_distance.first << " distance: " << path_azimuth_distance.second << std::endl;
+        //std::cerr << "path azimuth: " << path_azimuth_distance.first << " distance: " << path_azimuth_distance.second << std::endl;
         
         double error_azimuth = vehicle_azimuth_distance.first - path_azimuth_distance.first;
         double sin_error_azimuth = sin(error_azimuth*M_PI/180.0);
         double cos_error_azimuth = cos(error_azimuth*M_PI/180.0);
         
         double cross_track = vehicle_azimuth_distance.second*sin_error_azimuth;
-        std::cerr << "cross track: " << cross_track << std::endl;
+        //std::cerr << "cross track: " << cross_track << std::endl;
         
         std_msgs::Float64 setpoint;
         setpoint.data = 0.0;
@@ -88,7 +88,7 @@ void sendDesired()
         state_pub.publish(state);
         
         double progress = vehicle_azimuth_distance.second*cos_error_azimuth;
-        std::cerr << "progress: " << progress << std::endl;
+        //std::cerr << "progress: " << progress << std::endl;
         
         ros::Time now = ros::Time::now();
         
