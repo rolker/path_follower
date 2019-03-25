@@ -10,7 +10,13 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rosbag
   project11
+  genmsg
+  actionlib_msgs
+  actionlib
 )
+
+add_action_files(DIRECTORY action FILES path_follower.action)
+generate_messages(DEPENDENCIES actionlib_msgs geographic_msgs)
 
 catkin_package(
 #  INCLUDE_DIRS include

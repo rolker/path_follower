@@ -26,7 +26,8 @@
   <exec_depend>roscpp</exec_depend>
   <exec_depend>rosbag</exec_depend>
   <exec_depend>project11</exec_depend>
-
+  <depend>actionlib</depend>
+  <depend>actionlib_msgs</depend>
   <export>
   </export>
 </package>
