@@ -18,9 +18,6 @@ struct LatLong
     double longitude;
 };
 
-// http://wiki.ros.org/actionlib_tutorials/Tutorials/SimpleActionServer%28GoalCallbackMethod%29
-// http://wiki.ros.org/actionlib_tutorials/Tutorials/Writing%20a%20Callback%20Based%20Simple%20Action%20Client
-
 class PathFollower
 {
 public:
@@ -110,18 +107,12 @@ public:
             {
                 p1[0] = m_current_path[m_current_segment_index].latitude;
                 p1[1] = m_current_path[m_current_segment_index].longitude;
-                //p2[0] = m_current_path[m_current_segment_index+1].latitude;
-                //p2[1] = m_current_path[m_current_segment_index+1].longitude;
-                //std::cerr << "p1: " << p1[0] << "," << p1[1] << " p2: " << p2[0] << "," << p2[1] << std::endl;
                 
                 vehicle_position[0] = m_current_position.latitude;
                 vehicle_position[1] = m_current_position.longitude;
                     
-                //path_azimuth_distance = gz4d::geo::WGS84::Ellipsoid::inverse(p1,p2);
                 vehicle_azimuth_distance = gz4d::geo::WGS84::Ellipsoid::inverse(p1,vehicle_position);
 
-                //std::cerr << "path azimuth: " << path_azimuth_distance.first << " distance: " << path_azimuth_distance.second << std::endl;
-            
                 error_azimuth = vehicle_azimuth_distance.first - m_segment_azimuth_distances[m_current_segment_index].first;
                 sin_error_azimuth = sin(error_azimuth*M_PI/180.0);
                 cos_error_azimuth = cos(error_azimuth*M_PI/180.0);
@@ -148,7 +139,6 @@ public:
             }
             
             double cross_track = vehicle_azimuth_distance.second*sin_error_azimuth;
-            //std::cerr << "cross track: " << cross_track << std::endl;
             
             path_follower::path_followerFeedback feedback;
             feedback.percent_complete = (m_cumulative_distance+progress)/m_total_distance;
@@ -168,7 +158,6 @@ public:
             
             marine_msgs::NavEulerStamped desired_heading;
             desired_heading.header.stamp = now;
-            //desired_heading.orientation.heading = path_azimuth_distance.first - std::max(-90.0,std::min(90.0,cross_track));
             desired_heading.orientation.heading = m_segment_azimuth_distances[m_current_segment_index].first + m_crab_angle;
             m_desired_heading_pub.publish(desired_heading);
             
