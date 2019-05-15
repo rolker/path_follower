@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   genmsg
   actionlib_msgs
   actionlib
+  geographic_visualization_msgs
 )
 
 add_action_files(DIRECTORY action FILES path_follower.action)
@@ -21,7 +22,7 @@ generate_messages(DEPENDENCIES actionlib_msgs geographic_msgs)
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES asv_helm
-  CATKIN_DEPENDS geometry_msgs roscpp project11
+  CATKIN_DEPENDS geometry_msgs roscpp project11 geographic_visualization_msgs
 #  DEPENDS system_lib
 )
 

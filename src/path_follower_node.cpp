@@ -11,6 +11,7 @@
 #include "project11/gz4d_geo.h"
 #include "path_follower/path_followerAction.h"
 #include "actionlib/server/simple_action_server.h"
+#include "geographic_visualization_msgs/GeoVizItem.h"
 
 struct LatLong
 {
@@ -34,10 +35,13 @@ public:
         m_desired_speed_pub = m_node_handle.advertise<geometry_msgs::TwistStamped>("/project11/desired_speed",1);
         m_setpoint_pub = m_node_handle.advertise<std_msgs::Float64>("/project11/crab_angle/setpoint",1);
         m_state_pub = m_node_handle.advertise<std_msgs::Float64>("/project11/crab_angle/state",1);
-        
+        m_display_pub = m_node_handle.advertise<geographic_visualization_msgs::GeoVizItem>("/project11/display",5);
+
         m_position_sub = m_node_handle.subscribe("/position", 10, &PathFollower::positionCallback, this);
         m_heading_sub = m_node_handle.subscribe("/heading", 10, &PathFollower::headingCallback, this);
         m_control_effort_pub = m_node_handle.subscribe("/project11/crab_angle/control_effort", 10, &PathFollower::controlEfforCallback, this);
+        
+        m_state_sub = m_node_handle.subscribe("/project11/piloting_mode", 10, &PathFollower::stateCallback, this);
         
         m_action_server.registerGoalCallback(boost::bind(&PathFollower::goalCallback, this));
         m_action_server.registerPreemptCallback(boost::bind(&PathFollower::preemptCallback, this));
@@ -77,8 +81,50 @@ public:
             m_segment_azimuth_distances.push_back(gz4d::geo::WGS84::Ellipsoid::inverse(p1,p2));
             m_total_distance += m_segment_azimuth_distances.back().second;
         }
+        sendDisplay();
     }
     
+    void sendDisplay()
+    {
+        geographic_visualization_msgs::GeoVizItem vizItem;
+        vizItem.id = "path_follower";
+        if(m_action_server.isActive())
+        {
+            geographic_visualization_msgs::GeoVizPointList plist;
+            plist.size = 5.0;
+            if (m_autonomous_state)
+            {
+                plist.color.r = 1.0;
+                plist.color.g = 0.0;
+                plist.color.b = 0.0;
+                plist.color.a = 1.0;
+            }
+            else
+            {
+                plist.color.r = 0.5;
+                plist.color.g = 0.0;
+                plist.color.b = 0.0;
+                plist.color.a = 0.5;
+            }
+
+            for(auto s: m_current_path)
+            {
+                geographic_msgs::GeoPoint gp;
+                gp.latitude = s.latitude;
+                gp.longitude = s.longitude;
+                plist.points.push_back(gp);
+            }
+            vizItem.lines.push_back(plist);
+        }
+        m_display_pub.publish(vizItem);
+    }
+
+    void stateCallback(const std_msgs::String::ConstPtr &inmsg)
+    {
+        m_autonomous_state = inmsg->data == "autonomous";
+        sendDisplay();
+    }
+
     void preemptCallback()
     {
         m_action_server.setPreempted();
@@ -199,14 +245,19 @@ private:
     double m_total_distance; // total distance of complete path in meters.
     double m_cumulative_distance; // distance of completed segments in meters.
 
+    bool m_autonomous_state;
+
+    
     ros::Publisher m_desired_speed_pub;
     ros::Publisher m_desired_heading_pub;
     ros::Publisher m_state_pub;
     ros::Publisher m_setpoint_pub;
-    
+    ros::Publisher m_display_pub;
+
     ros::Subscriber m_position_sub;
     ros::Subscriber m_heading_sub;
     ros::Subscriber m_control_effort_pub;
+    ros::Subscriber m_state_sub;
 };
 
 
