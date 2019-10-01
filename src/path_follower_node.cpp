@@ -128,6 +128,7 @@ public:
     void preemptCallback()
     {
         m_action_server.setPreempted();
+        sendDisplay();
     }
     
     void controlEfforCallback(const std_msgs::Float64::ConstPtr& inmsg)
@@ -175,6 +176,7 @@ public:
                         result.ending_pose.position.latitude = m_current_position.latitude;
                         result.ending_pose.position.longitude = m_current_position.longitude;
                         m_action_server.setSucceeded(result);
+                        sendDisplay();
                         return;
                     }
                 }
