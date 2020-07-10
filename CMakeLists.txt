@@ -14,6 +14,9 @@ find_package(catkin REQUIRED COMPONENTS
   actionlib_msgs
   actionlib
   geographic_visualization_msgs
+  path_planner_common
+  project11_transformations
+  dubins_curves
 )
 
 add_action_files(DIRECTORY action FILES path_follower.action)
@@ -34,9 +37,14 @@ include_directories(
 add_executable(${PROJECT_NAME}_node src/path_follower_node.cpp)
 
 add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-add_dependencies(${PROJECT_NAME}_node marine_msgs_gencpp)
 
 target_link_libraries(${PROJECT_NAME}_node
+    ${catkin_LIBRARIES}
+)
+
+add_executable(mpc_adapter_node src/mpc_adapter_node.cpp)
+
+target_link_libraries(mpc_adapter_node
     ${catkin_LIBRARIES}
 )
 
