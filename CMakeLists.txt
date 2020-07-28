@@ -30,7 +30,7 @@ catkin_package(
 )
 
 include_directories(
-# include
+  include
   ${catkin_INCLUDE_DIRS}
 )
 
