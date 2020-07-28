@@ -44,6 +44,8 @@ target_link_libraries(${PROJECT_NAME}_node
 
 add_executable(mpc_adapter_node src/mpc_adapter_node.cpp)
 
+add_dependencies(mpc_adapter_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
 target_link_libraries(mpc_adapter_node
     ${catkin_LIBRARIES}
 )
