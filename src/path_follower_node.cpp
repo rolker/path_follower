@@ -31,17 +31,17 @@ public:
         m_total_distance = 0.0;
         m_cumulative_distance = 0.0;
     
-        m_desired_heading_pub = m_node_handle.advertise<marine_msgs::NavEulerStamped>("/project11/desired_heading",1);
-        m_desired_speed_pub = m_node_handle.advertise<geometry_msgs::TwistStamped>("/project11/desired_speed",1);
-        m_setpoint_pub = m_node_handle.advertise<std_msgs::Float64>("/project11/crab_angle/setpoint",1);
-        m_state_pub = m_node_handle.advertise<std_msgs::Float64>("/project11/crab_angle/state",1);
-        m_display_pub = m_node_handle.advertise<geographic_visualization_msgs::GeoVizItem>("/project11/display",5);
+        m_desired_heading_pub = m_node_handle.advertise<marine_msgs::NavEulerStamped>("project11/desired_heading",1);
+        m_desired_speed_pub = m_node_handle.advertise<geometry_msgs::TwistStamped>("project11/desired_speed",1);
+        m_setpoint_pub = m_node_handle.advertise<std_msgs::Float64>("project11/crab_angle/setpoint",1);
+        m_state_pub = m_node_handle.advertise<std_msgs::Float64>("project11/crab_angle/state",1);
+        m_display_pub = m_node_handle.advertise<geographic_visualization_msgs::GeoVizItem>("project11/display",5);
 
-        m_position_sub = m_node_handle.subscribe("/position", 10, &PathFollower::positionCallback, this);
-        m_heading_sub = m_node_handle.subscribe("/heading", 10, &PathFollower::headingCallback, this);
-        m_control_effort_pub = m_node_handle.subscribe("/project11/crab_angle/control_effort", 10, &PathFollower::controlEfforCallback, this);
+        m_position_sub = m_node_handle.subscribe("position", 10, &PathFollower::positionCallback, this);
+        m_heading_sub = m_node_handle.subscribe("heading", 10, &PathFollower::headingCallback, this);
+        m_control_effort_pub = m_node_handle.subscribe("project11/crab_angle/control_effort", 10, &PathFollower::controlEfforCallback, this);
         
-        m_state_sub = m_node_handle.subscribe("/project11/piloting_mode", 10, &PathFollower::stateCallback, this);
+        m_state_sub = m_node_handle.subscribe("project11/piloting_mode", 10, &PathFollower::stateCallback, this);
         
         m_action_server.registerGoalCallback(boost::bind(&PathFollower::goalCallback, this));
         m_action_server.registerPreemptCallback(boost::bind(&PathFollower::preemptCallback, this));

@@ -39,11 +39,11 @@ class MPCAdapterNode
 public:
     MPCAdapterNode():m_path_follower_client("path_follower_action"),m_transformations(m_node_handle)
     {
-        m_update_reference_trajectory_service = m_node_handle.advertiseService("/mpc/update_reference_trajectory", &MPCAdapterNode::updateReferenceTrajectory, this);
+        m_update_reference_trajectory_service = m_node_handle.advertiseService("mpc/update_reference_trajectory", &MPCAdapterNode::updateReferenceTrajectory, this);
         
-        m_position_sub = m_node_handle.subscribe("/position_map", 10, &MPCAdapterNode::positionCallback, this);
-        m_cmg_sub = m_node_handle.subscribe("/cmg", 10, &MPCAdapterNode::cmgCallback, this);
-        m_sog_sub = m_node_handle.subscribe("/sog", 10, &MPCAdapterNode::sogCallback, this);
+        m_position_sub = m_node_handle.subscribe("position_map", 10, &MPCAdapterNode::positionCallback, this);
+        m_cmg_sub = m_node_handle.subscribe("cmg", 10, &MPCAdapterNode::cmgCallback, this);
+        m_sog_sub = m_node_handle.subscribe("sog", 10, &MPCAdapterNode::sogCallback, this);
 
         
         ROS_INFO("Waiting for path_follower action server to start.");
