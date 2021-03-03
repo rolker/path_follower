@@ -8,10 +8,12 @@
 #include "std_msgs/Float64.h"
 #include "marine_msgs/NavEulerStamped.h"
 #include <vector>
-#include "project11/gz4d_geo.h"
+#include "project11/utils.h"
 #include "path_follower/path_followerAction.h"
 #include "actionlib/server/simple_action_server.h"
 #include "geographic_visualization_msgs/GeoVizItem.h"
+
+namespace p11 = project11;
 
 struct LatLong
 {
@@ -73,12 +75,12 @@ public:
         m_segment_azimuth_distances.clear();
         for(int i = 0; i < m_current_path.size()-1; i++)
         {
-            gz4d::geo::Point<double,gz4d::geo::WGS84::LatLon> p1, p2;
+            p11::LatLongDegrees p1, p2;
             p1[0] = m_current_path[i].latitude;
             p1[1] = m_current_path[i].longitude;
             p2[0] = m_current_path[i+1].latitude;
             p2[1] = m_current_path[i+1].longitude;
-            m_segment_azimuth_distances.push_back(gz4d::geo::WGS84::Ellipsoid::inverse(p1,p2));
+            m_segment_azimuth_distances.push_back(p11::WGS84::inverse(p1,p2));
             m_total_distance += m_segment_azimuth_distances.back().second;
         }
         sendDisplay();
@@ -140,10 +142,10 @@ public:
     {
         if(m_action_server.isActive() && !m_current_path.empty())
         {
-            gz4d::geo::Point<double,gz4d::geo::WGS84::LatLon> p1, p2,vehicle_position;
+            p11::LatLongDegrees p1, p2, vehicle_position;
             
-            std::pair<double,double> vehicle_azimuth_distance;
-            double error_azimuth;
+            std::pair<p11::AngleRadians,double> vehicle_azimuth_distance;
+            p11::AngleRadians error_azimuth;
             double sin_error_azimuth;
             double cos_error_azimuth;
             double progress;
@@ -158,11 +160,11 @@ public:
                 vehicle_position[0] = m_current_position.latitude;
                 vehicle_position[1] = m_current_position.longitude;
                     
-                vehicle_azimuth_distance = gz4d::geo::WGS84::Ellipsoid::inverse(p1,vehicle_position);
+                vehicle_azimuth_distance = p11::WGS84::inverse(p1,vehicle_position);
 
                 error_azimuth = vehicle_azimuth_distance.first - m_segment_azimuth_distances[m_current_segment_index].first;
-                sin_error_azimuth = sin(error_azimuth*M_PI/180.0);
-                cos_error_azimuth = cos(error_azimuth*M_PI/180.0);
+                sin_error_azimuth = sin(error_azimuth);
+                cos_error_azimuth = cos(error_azimuth);
 
                 progress = vehicle_azimuth_distance.second*cos_error_azimuth;
                 if (progress >= m_segment_azimuth_distances[m_current_segment_index].second)
@@ -206,7 +208,7 @@ public:
             
             marine_msgs::NavEulerStamped desired_heading;
             desired_heading.header.stamp = now;
-            desired_heading.orientation.heading = m_segment_azimuth_distances[m_current_segment_index].first + m_crab_angle;
+            desired_heading.orientation.heading = p11::AngleDegrees(m_segment_azimuth_distances[m_current_segment_index].first).value() + m_crab_angle;
             m_desired_heading_pub.publish(desired_heading);
             
             geometry_msgs::TwistStamped desired_speed;
@@ -235,7 +237,7 @@ private:
     actionlib::SimpleActionServer<path_follower::path_followerAction> m_action_server;
 
     std::vector<LatLong> m_current_path;
-    std::vector<std::pair<double, double> > m_segment_azimuth_distances;
+    std::vector<std::pair<p11::AngleRadians, double> > m_segment_azimuth_distances;
     int m_current_segment_index;
     LatLong m_current_position;
 
