@@ -37,13 +37,16 @@ int buildPath(double q[3], double t, void* user_data)
 class MPCAdapterNode
 {
 public:
-    MPCAdapterNode():m_path_follower_client("path_follower_action"),m_transformations(m_node_handle)
+    MPCAdapterNode():m_path_follower_client("path_follower_action")
     {
         m_update_reference_trajectory_service = m_node_handle.advertiseService("mpc/update_reference_trajectory", &MPCAdapterNode::updateReferenceTrajectory, this);
         
         m_position_sub = m_node_handle.subscribe("position_map", 10, &MPCAdapterNode::positionCallback, this);
         m_cmg_sub = m_node_handle.subscribe("cmg", 10, &MPCAdapterNode::cmgCallback, this);
         m_sog_sub = m_node_handle.subscribe("sog", 10, &MPCAdapterNode::sogCallback, this);
+
+        ros::NodeHandle nh_private("~");
+        nh_private.param<std::string>("map_frame", m_map_frame, "map");
 
         
         ROS_INFO("Waiting for path_follower action server to start.");
@@ -59,10 +62,9 @@ public:
         
         if(!req.plan.paths.empty())
         {
-            while (!m_transformations.haveOrigin())
+            while (!m_transformations().canTransform(m_map_frame, "earth", ros::Time(0), ros::Duration(0.5)))
             {
                 ROS_INFO("Waiting for origin...");
-                ros::Duration(0.5).sleep();
             }
 
             path_follower::path_followerGoal goal;
@@ -159,7 +161,7 @@ private:
     ros::Subscriber m_sog_sub;
 
     double m_sog, m_cmg, m_position_x, m_position_y;
-    
+    std::string m_map_frame;
 };
 
 int main(int argc, char **argv)
