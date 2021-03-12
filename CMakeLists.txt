@@ -13,7 +13,6 @@ find_package(catkin REQUIRED COMPONENTS
   actionlib
   geographic_visualization_msgs
   path_planner_common
-  project11_transformations
   dubins_curves
   nav_msgs
 )
