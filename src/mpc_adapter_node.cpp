@@ -2,10 +2,11 @@
 #include <path_planner_common/UpdateReferenceTrajectory.h>
 #include <actionlib/client/simple_action_client.h>
 #include <path_follower/path_followerAction.h>
-#include "project11_transformations/local_services.h"
-#include <geometry_msgs/PoseStamped.h>
-#include "marine_msgs/CourseMadeGoodStamped.h"
-#include <geometry_msgs/TwistStamped.h>
+#include "project11/tf2_utils.h"
+#include <nav_msgs/Odometry.h>
+#include "project11/utils.h"
+
+namespace p11 = project11;
 
 extern "C" {
     #include "dubins.h"
@@ -41,9 +42,7 @@ public:
     {
         m_update_reference_trajectory_service = m_node_handle.advertiseService("mpc/update_reference_trajectory", &MPCAdapterNode::updateReferenceTrajectory, this);
         
-        m_position_sub = m_node_handle.subscribe("position_map", 10, &MPCAdapterNode::positionCallback, this);
-        m_cmg_sub = m_node_handle.subscribe("cmg", 10, &MPCAdapterNode::cmgCallback, this);
-        m_sog_sub = m_node_handle.subscribe("sog", 10, &MPCAdapterNode::sogCallback, this);
+        m_odom_sub = m_node_handle.subscribe("odom", 10, &MPCAdapterNode::odometryCallback, this);
 
         ros::NodeHandle nh_private("~");
         nh_private.param<std::string>("map_frame", m_map_frame, "map");
@@ -88,18 +87,18 @@ public:
                 int ret = dubins_path_sample_many(&dpath, goal.speed, buildPath, &states);
             }
             
-            if(states.size() > 1)
+            if(states.size() > 1 && m_odometry)
             {
                 ROS_INFO_STREAM("path first point: " << states[0].x << ", " << states[0].y << " yaw: " << states[0].yaw  << " (degs) " << states[0].yaw*180/M_PI);
                 ROS_INFO_STREAM("path second point: " << states[1].x << ", " << states[1].y << " yaw: " << states[1].yaw  << " (degs) " << states[1].yaw*180/M_PI);
                 
-                ROS_INFO_STREAM("now: " << m_position_x << ", " << m_position_y << " cmg: " << m_cmg << " (degs) " << m_cmg*180/M_PI);
-                double next_x = m_position_x + m_sog*sin(m_cmg);
-                double next_y = m_position_y + m_sog*cos(m_cmg);
+                ROS_INFO_STREAM("now:\n" << *m_odometry);
+                double next_x = m_odometry->pose.pose.position.x + m_odometry->twist.twist.linear.x;
+                double next_y = m_odometry->pose.pose.position.y + m_odometry->twist.twist.linear.y;
                 ROS_INFO_STREAM("in a sec: " << next_x << ", " << next_y);
                 res.state.x = next_x;
                 res.state.y = next_y;
-                res.state.heading = m_cmg;
+                res.state.heading = M_PI_2-tf2::getYaw(m_odometry->pose.pose.orientation);
 
                 if (sqrt(pow(next_x-states[1].x,2)+pow(next_y-states[1].y,2)) < 25)
                 {
@@ -134,20 +133,9 @@ public:
         return false;
     }
 
-    void positionCallback(const geometry_msgs::PoseStamped::ConstPtr &inmsg)
+    void odometryCallback(const nav_msgs::Odometry::ConstPtr &inmsg)
     {
-        m_position_x = inmsg->pose.position.x;
-        m_position_y = inmsg->pose.position.y;
-    }
-
-    void cmgCallback(const marine_msgs::CourseMadeGoodStamped::ConstPtr& inmsg)
-    {
-        m_cmg = inmsg->course * M_PI / 180.0;
-    }
-
-    void sogCallback(const geometry_msgs::TwistStamped::ConstPtr& inmsg)
-    {
-        m_sog = inmsg->twist.linear.x;
+      m_odometry = inmsg;
     }
 
 private:
@@ -156,11 +144,8 @@ private:
     actionlib::SimpleActionClient<path_follower::path_followerAction> m_path_follower_client;
     project11::Transformations m_transformations;
     
-    ros::Subscriber m_position_sub;
-    ros::Subscriber m_cmg_sub;
-    ros::Subscriber m_sog_sub;
-
-    double m_sog, m_cmg, m_position_x, m_position_y;
+    ros::Subscriber m_odom_sub;
+    nav_msgs::Odometry::ConstPtr m_odometry;
     std::string m_map_frame;
 };
 

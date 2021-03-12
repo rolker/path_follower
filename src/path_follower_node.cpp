@@ -1,53 +1,64 @@
-#include "ros/ros.h"
-#include "geographic_msgs/GeoPointStamped.h"
-#include "geographic_msgs/GeoPath.h"
-#include "geometry_msgs/TwistStamped.h"
-#include "std_msgs/Bool.h"
-#include "std_msgs/String.h"
-#include "std_msgs/Float32.h"
-#include "std_msgs/Float64.h"
-#include "marine_msgs/NavEulerStamped.h"
 #include <vector>
-#include "project11/utils.h"
+#include "ros/ros.h"
+#include "std_msgs/Float64.h"
+#include "std_msgs/Bool.h"
+#include "geometry_msgs/TwistStamped.h"
+#include "geographic_visualization_msgs/GeoVizItem.h"
 #include "path_follower/path_followerAction.h"
 #include "actionlib/server/simple_action_server.h"
-#include "geographic_visualization_msgs/GeoVizItem.h"
+#include "project11/utils.h"
+#include "project11/tf2_utils.h"
 
 namespace p11 = project11;
-
-struct LatLong
-{
-    double latitude;
-    double longitude;
-};
 
 class PathFollower
 {
 public:
+  struct AzimuthDistance
+  {
+    p11::AngleRadians azimuth;
+    double distance;
+  };
+  
     PathFollower(std::string name):
-      m_action_server(m_node_handle, name, false)
+      m_action_server(ros::NodeHandle(), name, false),m_send_display_flag(true)
     {
-        m_current_speed = 3.0;
+        m_goal_speed = 0.0;
         m_crab_angle = 0.0;
         m_current_segment_index = 0;
         m_total_distance = 0.0;
         m_cumulative_distance = 0.0;
     
-        m_desired_heading_pub = m_node_handle.advertise<marine_msgs::NavEulerStamped>("project11/desired_heading",1);
-        m_desired_speed_pub = m_node_handle.advertise<geometry_msgs::TwistStamped>("project11/desired_speed",1);
-        m_setpoint_pub = m_node_handle.advertise<std_msgs::Float64>("project11/crab_angle/setpoint",1);
-        m_state_pub = m_node_handle.advertise<std_msgs::Float64>("project11/crab_angle/state",1);
-        m_display_pub = m_node_handle.advertise<geographic_visualization_msgs::GeoVizItem>("project11/display",5);
+        ros::NodeHandle nh;
+        
+        m_enabled = true;
+        m_enable_sub = nh.subscribe<std_msgs::Bool>("enable", 10, [&](const std_msgs::BoolConstPtr& msg){this->m_enabled = msg->data; this->sendDisplay();});
+        
+        m_cmd_vel_pub = nh.advertise<geometry_msgs::TwistStamped>("cmd_vel",1);
 
-        m_position_sub = m_node_handle.subscribe("position", 10, &PathFollower::positionCallback, this);
-        m_heading_sub = m_node_handle.subscribe("heading", 10, &PathFollower::headingCallback, this);
-        m_control_effort_pub = m_node_handle.subscribe("project11/crab_angle/control_effort", 10, &PathFollower::controlEfforCallback, this);
+        m_display_pub = nh.advertise<geographic_visualization_msgs::GeoVizItem>("project11/display",5);
+        m_vis_display.id = "path_follower";
+
+        ros::NodeHandle nh_private("~");
         
-        m_state_sub = m_node_handle.subscribe("project11/piloting_mode", 10, &PathFollower::stateCallback, this);
+        nh_private.param<std::string>("map_frame", m_map_frame, "map");
+        nh_private.param<std::string>("base_frame", m_base_frame, "base_link");
+
         
+        m_setpoint_pub = nh_private.advertise<std_msgs::Float64>("crab_angle_pid/setpoint",1, true);
+        m_state_pub = nh_private.advertise<std_msgs::Float64>("crab_angle_pid/state",1);
+        m_control_effort_sub = nh_private.subscribe("crab_angle_pid/control_effort", 10, &PathFollower::controlEfforCallback, this);
+        m_pid_enable_pub = nh_private.advertise<std_msgs::Bool>("crab_angle_pid/pid_enable", 1);
+        
+        std_msgs::Float64 setpoint;
+        setpoint.data = 0.0;
+        m_setpoint_pub.publish(setpoint);
+
         m_action_server.registerGoalCallback(boost::bind(&PathFollower::goalCallback, this));
         m_action_server.registerPreemptCallback(boost::bind(&PathFollower::preemptCallback, this));
         m_action_server.start();
+        
+        m_timer = nh.createTimer(ros::Duration(0.1), std::bind(&PathFollower::timerCallback, this, std::placeholders::_1));
     }
     
     ~PathFollower()
@@ -58,210 +69,225 @@ public:
     {
         auto goal = m_action_server.acceptNewGoal();
 
-        m_current_speed = goal->speed;
+        m_goal_speed = goal->speed;
         m_current_segment_index = 0;
         m_total_distance = 0.0;
         m_cumulative_distance = 0.0;
 
-        m_current_path.clear();
+        m_goal_path.clear();
+        
+        geometry_msgs::TransformStamped earth_to_map = m_transforms().lookupTransform(m_map_frame, "earth", ros::Time(0));
+
+        geographic_visualization_msgs::GeoVizPointList gvpl;
+        
         for(auto pose: goal->path.poses)
         {
-            LatLong ll;
-            ll.latitude = pose.pose.position.latitude;
-            ll.longitude = pose.pose.position.longitude;
-            m_current_path.push_back(ll);
+          p11::LatLongDegrees p;
+          p11::fromMsg(pose.pose.position, p);
+          p11::ECEF ecef_point = p;
+          geometry_msgs::Point ecef_point_msg;
+          p11::toMsg(ecef_point,ecef_point_msg);
+          geometry_msgs::PoseStamped map_point;
+          tf2::doTransform(ecef_point_msg, map_point.pose.position, earth_to_map);
+          map_point.header.frame_id = m_map_frame;
+          map_point.header.stamp = pose.header.stamp;
+          m_goal_path.push_back(map_point);
+          gvpl.points.push_back(pose.pose.position);
         }
+        m_vis_display.lines.clear();
+        m_vis_display.lines.push_back(gvpl);
         
         m_segment_azimuth_distances.clear();
-        for(int i = 0; i < m_current_path.size()-1; i++)
+        for(int i = 0; i < m_goal_path.size()-1; i++)
         {
-            p11::LatLongDegrees p1, p2;
-            p1[0] = m_current_path[i].latitude;
-            p1[1] = m_current_path[i].longitude;
-            p2[0] = m_current_path[i+1].latitude;
-            p2[1] = m_current_path[i+1].longitude;
-            m_segment_azimuth_distances.push_back(p11::WGS84::inverse(p1,p2));
-            m_total_distance += m_segment_azimuth_distances.back().second;
+          AzimuthDistance ad;
+          double dx = m_goal_path[i+1].pose.position.x - m_goal_path[i].pose.position.x;
+          double dy = m_goal_path[i+1].pose.position.y - m_goal_path[i].pose.position.y;
+          ad.azimuth = atan2(dy,dx);
+          ad.distance = sqrt(dx*dx+dy*dy);
+          m_total_distance += ad.distance;
+          m_segment_azimuth_distances.push_back(ad);
         }
-        sendDisplay();
+        m_send_display_flag = true;
     }
     
     void sendDisplay()
     {
-        geographic_visualization_msgs::GeoVizItem vizItem;
-        vizItem.id = "path_follower";
-        if(m_action_server.isActive())
+      if(!m_vis_display.lines.empty())
+      {
+        auto& plist = m_vis_display.lines.front();
+        plist.size = 5.0;
+        if (m_enabled)
         {
-            geographic_visualization_msgs::GeoVizPointList plist;
-            plist.size = 5.0;
-            if (m_autonomous_state)
-            {
-                plist.color.r = 1.0;
-                plist.color.g = 0.0;
-                plist.color.b = 0.0;
-                plist.color.a = 1.0;
-            }
-            else
-            {
-                plist.color.r = 0.5;
-                plist.color.g = 0.0;
-                plist.color.b = 0.0;
-                plist.color.a = 0.5;
-            }
-
-            for(auto s: m_current_path)
-            {
-                geographic_msgs::GeoPoint gp;
-                gp.latitude = s.latitude;
-                gp.longitude = s.longitude;
-                plist.points.push_back(gp);
-            }
-            vizItem.lines.push_back(plist);
+            plist.color.r = 1.0;
+            plist.color.g = 0.0;
+            plist.color.b = 0.0;
+            plist.color.a = 1.0;
         }
-        m_display_pub.publish(vizItem);
-    }
-
-    void stateCallback(const std_msgs::String::ConstPtr &inmsg)
-    {
-        m_autonomous_state = inmsg->data == "autonomous";
-        sendDisplay();
+        else
+        {
+            plist.color.r = 0.5;
+            plist.color.g = 0.0;
+            plist.color.b = 0.0;
+            plist.color.a = 0.5;
+        }
+      }
+      m_display_pub.publish(m_vis_display);
+      m_send_display_flag = false;
     }
 
     void preemptCallback()
     {
         m_action_server.setPreempted();
-        sendDisplay();
+        m_vis_display.lines.clear();
+        m_send_display_flag = true;
     }
     
     void controlEfforCallback(const std_msgs::Float64::ConstPtr& inmsg)
     {
-        m_crab_angle = inmsg->data;
+        m_crab_angle = p11::AngleDegrees(inmsg->data);
     }
 
-    void sendDesired()
+    void timerCallback(const ros::TimerEvent event)
     {
-        if(m_action_server.isActive() && !m_current_path.empty())
+      if(m_send_display_flag)
+        sendDisplay();
+        if(m_action_server.isActive() && m_enabled && !m_goal_path.empty())
         {
-            p11::LatLongDegrees p1, p2, vehicle_position;
-            
-            std::pair<p11::AngleRadians,double> vehicle_azimuth_distance;
-            p11::AngleRadians error_azimuth;
-            double sin_error_azimuth;
-            double cos_error_azimuth;
-            double progress;
+          geometry_msgs::TransformStamped base_to_map;
+          try
+          {
+            base_to_map = m_transforms().lookupTransform(m_map_frame, m_base_frame, ros::Time(0));
+          }
+          catch (tf2::TransformException &ex)
+          {
+            ROS_WARN_STREAM("timerCallback: " << ex.what());
+          }
 
-            bool found_current_segment = false;
+          double vehicle_distance;
             
-            while(!found_current_segment)
+          p11::AngleRadians error_azimuth;
+          double sin_error_azimuth;
+          double cos_error_azimuth;
+          double progress;
+
+          bool found_current_segment = false;
+            
+          while(!found_current_segment)
+          {
+            double dx = m_goal_path[m_current_segment_index].pose.position.x - base_to_map.transform.translation.x;
+            double dy = m_goal_path[m_current_segment_index].pose.position.y - base_to_map.transform.translation.y;
+            vehicle_distance = sqrt(dx*dx+dy*dy);
+
+            // angle from p to vehicle
+            p11::AngleRadians azimuth = atan2(-dy, -dx);
+            
+            error_azimuth = azimuth - m_segment_azimuth_distances[m_current_segment_index].azimuth;
+
+            sin_error_azimuth = sin(error_azimuth);
+            cos_error_azimuth = cos(error_azimuth);
+
+            progress = vehicle_distance*cos_error_azimuth;
+            if (progress >= m_segment_azimuth_distances[m_current_segment_index].distance)
             {
-                p1[0] = m_current_path[m_current_segment_index].latitude;
-                p1[1] = m_current_path[m_current_segment_index].longitude;
-                
-                vehicle_position[0] = m_current_position.latitude;
-                vehicle_position[1] = m_current_position.longitude;
-                    
-                vehicle_azimuth_distance = p11::WGS84::inverse(p1,vehicle_position);
-
-                error_azimuth = vehicle_azimuth_distance.first - m_segment_azimuth_distances[m_current_segment_index].first;
-                sin_error_azimuth = sin(error_azimuth);
-                cos_error_azimuth = cos(error_azimuth);
-
-                progress = vehicle_azimuth_distance.second*cos_error_azimuth;
-                if (progress >= m_segment_azimuth_distances[m_current_segment_index].second)
-                {
-                    m_cumulative_distance += m_segment_azimuth_distances[m_current_segment_index].second;
-                    m_current_segment_index += 1;
-                    // have we reached the last segment?
-                    if(m_current_segment_index >= m_current_path.size()-1)
-                    {
-                        path_follower::path_followerResult result;
-                        result.ending_pose.position.latitude = m_current_position.latitude;
-                        result.ending_pose.position.longitude = m_current_position.longitude;
-                        m_action_server.setSucceeded(result);
-                        sendDisplay();
-                        return;
-                    }
-                }
-                else
-                {
-                    found_current_segment = true;
-                }
+              m_cumulative_distance += m_segment_azimuth_distances[m_current_segment_index].distance;
+              m_current_segment_index += 1;
+              // have we reached the last segment?
+              if(m_current_segment_index >= m_goal_path.size()-1)
+              {
+                path_follower::path_followerResult result;
+                result.ending_pose.position = m_transforms.map_to_wgs84(geometry_msgs::Point(), m_base_frame);
+                m_action_server.setSucceeded(result);
+                sendDisplay();
+                return;
+              }
             }
+            else
+            {
+              found_current_segment = true;
+            }
+          }
             
-            double cross_track = vehicle_azimuth_distance.second*sin_error_azimuth;
+          double cross_track = vehicle_distance*sin_error_azimuth;
             
-            path_follower::path_followerFeedback feedback;
-            feedback.percent_complete = (m_cumulative_distance+progress)/m_total_distance;
-            feedback.crosstrack_error = cross_track;
-            m_action_server.publishFeedback(feedback);
+          path_follower::path_followerFeedback feedback;
+          feedback.percent_complete = (m_cumulative_distance+progress)/m_total_distance;
+          feedback.crosstrack_error = cross_track;
+          m_action_server.publishFeedback(feedback);
             
-            std_msgs::Float64 setpoint;
-            setpoint.data = 0.0;
-            m_setpoint_pub.publish(setpoint);
+          std_msgs::Bool pid_enable;
+          pid_enable.data = true;
+          m_pid_enable_pub.publish(pid_enable);
             
-            std_msgs::Float64 state;
-            state.data = cross_track;
-            m_state_pub.publish(state);
+          std_msgs::Float64 setpoint;
+          setpoint.data = 0.0;
+          m_setpoint_pub.publish(setpoint);
+            
+          std_msgs::Float64 state;
+          state.data = cross_track;
+          m_state_pub.publish(state);
             
             
-            ros::Time now = ros::Time::now();
-            
-            marine_msgs::NavEulerStamped desired_heading;
-            desired_heading.header.stamp = now;
-            desired_heading.orientation.heading = p11::AngleDegrees(m_segment_azimuth_distances[m_current_segment_index].first).value() + m_crab_angle;
-            m_desired_heading_pub.publish(desired_heading);
-            
-            geometry_msgs::TwistStamped desired_speed;
-            desired_speed.header.stamp = now;
-            desired_speed.twist.linear.x = m_current_speed;
-            m_desired_speed_pub.publish(desired_speed);
-            
+          ros::Time now = ros::Time::now();
+          geometry_msgs::TwistStamped ts;
+          ts.header.frame_id = m_base_frame;
+          ts.header.stamp = event.current_real;
+          
+          p11::AngleRadians heading = tf2::getYaw(base_to_map.transform.rotation);
+          p11::AngleRadians target_heading = m_segment_azimuth_distances[m_current_segment_index].azimuth + m_crab_angle;
+
+          ts.twist.angular.z = p11::AngleRadiansZeroCentered(target_heading-heading).value();
+          ts.twist.linear.x = m_goal_speed;
+
+          m_cmd_vel_pub.publish(ts);
+        }
+        else
+        {
+            std_msgs::Bool pid_enable;
+            pid_enable.data = false;
+            m_pid_enable_pub.publish(pid_enable);
         }
     }
-
-    void positionCallback(const geographic_msgs::GeoPointStamped::ConstPtr& inmsg)
-    {
-        m_current_position.latitude = inmsg->position.latitude;
-        m_current_position.longitude = inmsg->position.longitude;
-        sendDesired();
-    }
-
-    void headingCallback(const marine_msgs::NavEulerStamped::ConstPtr& inmsg)
-    {
-        m_current_heading = inmsg->orientation.heading;
-    }
-    
     
 private:
-    ros::NodeHandle m_node_handle;
     actionlib::SimpleActionServer<path_follower::path_followerAction> m_action_server;
 
-    std::vector<LatLong> m_current_path;
-    std::vector<std::pair<p11::AngleRadians, double> > m_segment_azimuth_distances;
+    std::vector<geometry_msgs::PoseStamped> m_goal_path;
+    std::vector<AzimuthDistance> m_segment_azimuth_distances;
     int m_current_segment_index;
-    LatLong m_current_position;
 
-    double m_current_speed;
-    double m_current_heading;
+    double m_goal_speed;
 
-    double m_crab_angle;
+    p11::AngleRadians m_crab_angle;
     
     double m_total_distance; // total distance of complete path in meters.
     double m_cumulative_distance; // distance of completed segments in meters.
 
-    bool m_autonomous_state;
-
+    bool m_enabled;
+    ros::Subscriber m_enable_sub;
     
-    ros::Publisher m_desired_speed_pub;
-    ros::Publisher m_desired_heading_pub;
+    // output
+    ros::Publisher m_cmd_vel_pub;
+
+    // pid topics
     ros::Publisher m_state_pub;
     ros::Publisher m_setpoint_pub;
-    ros::Publisher m_display_pub;
+    ros::Subscriber m_control_effort_sub;
+    ros::Publisher m_pid_enable_pub;
 
-    ros::Subscriber m_position_sub;
-    ros::Subscriber m_heading_sub;
-    ros::Subscriber m_control_effort_pub;
-    ros::Subscriber m_state_sub;
+    // display
+    ros::Publisher m_display_pub;
+    geographic_visualization_msgs::GeoVizItem m_vis_display;
+
+
+    // tf frames
+    std::string m_map_frame;
+    std::string m_base_frame;
+    
+    p11::Transformations m_transforms;
+    
+    ros::Timer m_timer;
+    bool m_send_display_flag;
 };
 
 

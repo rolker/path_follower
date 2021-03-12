@@ -6,9 +6,7 @@ add_compile_options(-std=c++11)
 find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   geographic_msgs
-  marine_msgs
   roscpp
-  rosbag
   project11
   genmsg
   actionlib_msgs
@@ -17,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   path_planner_common
   project11_transformations
   dubins_curves
+  nav_msgs
 )
 
 add_action_files(DIRECTORY action FILES path_follower.action)

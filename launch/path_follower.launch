@@ -1,0 +1,29 @@
+<launch>
+  <arg name="namespace" default=""/>
+  <arg name="cmd_vel_topic" default="cmd_vel"/>
+  <arg name="enable_topic" default="enable"/>
+  <arg name="map_frame" default="map"/>
+  <arg name="base_frame" default="base_link"/>
+  
+  <node name="crab_angle_pid" pkg="pid" type="controller" ns="$(arg namespace)/path_follower">
+    <param name="Kp" value="6.0" />
+    <param name="Ki" value="0.5" />
+    <param name="Kd" value="0.6" />
+    <param name="upper_limit" value="90" />
+    <param name="lower_limit" value="-90" />
+    <param name="windup_limit" value="50" />
+    <remap from="control_effort" to="crab_angle_pid/control_effort"/>
+    <remap from="pid_debug" to="crab_angle_pid/pid_debug"/>
+    <remap from="pid_enable" to="crab_angle_pid/pid_enable"/>
+    <remap from="setpoint" to="crab_angle_pid/setpoint"/>
+    <remap from="state" to="crab_angle_pid/state"/>
+  </node>
+  <node pkg="path_follower" type="path_follower_node" name="path_follower" ns="$(arg namespace)">
+    <remap from="cmd_vel" to="$(arg cmd_vel_topic)"/>
+    <remap from="enable" to="$(arg enable_topic)"/>
+    <param name="map_frame" value="$(arg map_frame)"/>
+    <param name="base_frame" value="$(arg base_frame)"/>
+  </node>
+
+
+</launch>
