@@ -18,6 +18,7 @@
   <depend>actionlib_msgs</depend>
   <depend>path_planner_common</depend>
   <depend>nav_msgs</depend>
+  <depend>pid</depend>
   
   <export>
   </export>
