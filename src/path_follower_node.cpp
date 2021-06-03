@@ -21,7 +21,7 @@ public:
   };
   
     PathFollower(std::string name):
-      m_action_server(ros::NodeHandle(), name, false),m_send_display_flag(true)
+      m_action_server(ros::NodeHandle(), name, false)
     {
         m_goal_speed = 0.0;
         m_crab_angle = 0.0;
@@ -108,7 +108,7 @@ public:
           m_total_distance += ad.distance;
           m_segment_azimuth_distances.push_back(ad);
         }
-        m_send_display_flag = true;
+        sendDisplay();
     }
     
     void sendDisplay()
@@ -133,14 +133,14 @@ public:
         }
       }
       m_display_pub.publish(m_vis_display);
-      m_send_display_flag = false;
+      m_last_display_send_time = ros::Time::now();
     }
 
     void preemptCallback()
     {
         m_action_server.setPreempted();
         m_vis_display.lines.clear();
-        m_send_display_flag = true;
+        sendDisplay();
     }
     
     void controlEfforCallback(const std_msgs::Float64::ConstPtr& inmsg)
@@ -150,103 +150,104 @@ public:
 
     void timerCallback(const ros::TimerEvent event)
     {
-      if(m_send_display_flag)
-        sendDisplay();
-        if(m_action_server.isActive() && m_enabled && !m_goal_path.empty())
+      if(m_action_server.isActive() && m_enabled && !m_goal_path.empty())
+      {
+        geometry_msgs::TransformStamped base_to_map;
+        try
         {
-          geometry_msgs::TransformStamped base_to_map;
-          try
-          {
-            base_to_map = m_transforms().lookupTransform(m_map_frame, m_base_frame, ros::Time(0));
-          }
-          catch (tf2::TransformException &ex)
-          {
-            ROS_WARN_STREAM("timerCallback: " << ex.what());
-          }
+          base_to_map = m_transforms().lookupTransform(m_map_frame, m_base_frame, ros::Time(0));
+        }
+        catch (tf2::TransformException &ex)
+        {
+          ROS_WARN_STREAM("timerCallback: " << ex.what());
+        }
 
-          double vehicle_distance;
-            
-          p11::AngleRadians error_azimuth;
-          double sin_error_azimuth;
-          double cos_error_azimuth;
-          double progress;
-
-          bool found_current_segment = false;
-            
-          while(!found_current_segment)
-          {
-            double dx = m_goal_path[m_current_segment_index].pose.position.x - base_to_map.transform.translation.x;
-            double dy = m_goal_path[m_current_segment_index].pose.position.y - base_to_map.transform.translation.y;
-            vehicle_distance = sqrt(dx*dx+dy*dy);
-
-            // angle from p to vehicle
-            p11::AngleRadians azimuth = atan2(-dy, -dx);
-            
-            error_azimuth = azimuth - m_segment_azimuth_distances[m_current_segment_index].azimuth;
-
-            sin_error_azimuth = sin(error_azimuth);
-            cos_error_azimuth = cos(error_azimuth);
-
-            progress = vehicle_distance*cos_error_azimuth;
-            if (progress >= m_segment_azimuth_distances[m_current_segment_index].distance)
-            {
-              m_cumulative_distance += m_segment_azimuth_distances[m_current_segment_index].distance;
-              m_current_segment_index += 1;
-              // have we reached the last segment?
-              if(m_current_segment_index >= m_goal_path.size()-1)
-              {
-                path_follower::path_followerResult result;
-                result.ending_pose.position = m_transforms.map_to_wgs84(geometry_msgs::Point(), m_base_frame);
-                m_action_server.setSucceeded(result);
-                sendDisplay();
-                return;
-              }
-            }
-            else
-            {
-              found_current_segment = true;
-            }
-          }
-            
-          double cross_track = vehicle_distance*sin_error_azimuth;
-            
-          path_follower::path_followerFeedback feedback;
-          feedback.percent_complete = (m_cumulative_distance+progress)/m_total_distance;
-          feedback.crosstrack_error = cross_track;
-          m_action_server.publishFeedback(feedback);
-            
-          std_msgs::Bool pid_enable;
-          pid_enable.data = true;
-          m_pid_enable_pub.publish(pid_enable);
-            
-          std_msgs::Float64 setpoint;
-          setpoint.data = 0.0;
-          m_setpoint_pub.publish(setpoint);
-            
-          std_msgs::Float64 state;
-          state.data = cross_track;
-          m_state_pub.publish(state);
-            
-            
-          ros::Time now = ros::Time::now();
-          geometry_msgs::TwistStamped ts;
-          ts.header.frame_id = m_base_frame;
-          ts.header.stamp = event.current_real;
+        double vehicle_distance;
           
-          p11::AngleRadians heading = tf2::getYaw(base_to_map.transform.rotation);
-          p11::AngleRadians target_heading = m_segment_azimuth_distances[m_current_segment_index].azimuth + m_crab_angle;
+        p11::AngleRadians error_azimuth;
+        double sin_error_azimuth;
+        double cos_error_azimuth;
+        double progress;
 
-          ts.twist.angular.z = p11::AngleRadiansZeroCentered(target_heading-heading).value();
-          ts.twist.linear.x = m_goal_speed;
-
-          m_cmd_vel_pub.publish(ts);
-        }
-        else
+        bool found_current_segment = false;
+          
+        while(!found_current_segment)
         {
-            std_msgs::Bool pid_enable;
-            pid_enable.data = false;
-            m_pid_enable_pub.publish(pid_enable);
+          double dx = m_goal_path[m_current_segment_index].pose.position.x - base_to_map.transform.translation.x;
+          double dy = m_goal_path[m_current_segment_index].pose.position.y - base_to_map.transform.translation.y;
+          vehicle_distance = sqrt(dx*dx+dy*dy);
+
+          // angle from p to vehicle
+          p11::AngleRadians azimuth = atan2(-dy, -dx);
+          
+          error_azimuth = azimuth - m_segment_azimuth_distances[m_current_segment_index].azimuth;
+
+          sin_error_azimuth = sin(error_azimuth);
+          cos_error_azimuth = cos(error_azimuth);
+
+          progress = vehicle_distance*cos_error_azimuth;
+          if (progress >= m_segment_azimuth_distances[m_current_segment_index].distance)
+          {
+            m_cumulative_distance += m_segment_azimuth_distances[m_current_segment_index].distance;
+            m_current_segment_index += 1;
+            // have we reached the last segment?
+            if(m_current_segment_index >= m_goal_path.size()-1)
+            {
+              path_follower::path_followerResult result;
+              result.ending_pose.position = m_transforms.map_to_wgs84(geometry_msgs::Point(), m_base_frame);
+              m_action_server.setSucceeded(result);
+              sendDisplay();
+              return;
+            }
+          }
+          else
+          {
+            found_current_segment = true;
+          }
         }
+          
+        double cross_track = vehicle_distance*sin_error_azimuth;
+          
+        path_follower::path_followerFeedback feedback;
+        feedback.percent_complete = (m_cumulative_distance+progress)/m_total_distance;
+        feedback.crosstrack_error = cross_track;
+        m_action_server.publishFeedback(feedback);
+          
+        std_msgs::Bool pid_enable;
+        pid_enable.data = true;
+        m_pid_enable_pub.publish(pid_enable);
+          
+        std_msgs::Float64 setpoint;
+        setpoint.data = 0.0;
+        m_setpoint_pub.publish(setpoint);
+          
+        std_msgs::Float64 state;
+        state.data = cross_track;
+        m_state_pub.publish(state);
+          
+          
+        ros::Time now = ros::Time::now();
+        geometry_msgs::TwistStamped ts;
+        ts.header.frame_id = m_base_frame;
+        ts.header.stamp = event.current_real;
+        
+        p11::AngleRadians heading = tf2::getYaw(base_to_map.transform.rotation);
+        p11::AngleRadians target_heading = m_segment_azimuth_distances[m_current_segment_index].azimuth + m_crab_angle;
+
+        ts.twist.angular.z = p11::AngleRadiansZeroCentered(target_heading-heading).value();
+        ts.twist.linear.x = m_goal_speed;
+
+        m_cmd_vel_pub.publish(ts);
+      }
+      else
+      {
+          std_msgs::Bool pid_enable;
+          pid_enable.data = false;
+          m_pid_enable_pub.publish(pid_enable);
+      }
+      if(ros::Time::now() - m_last_display_send_time > ros::Duration(1.0))
+        sendDisplay();
+
     }
     
 private:
@@ -287,7 +288,7 @@ private:
     p11::Transformations m_transforms;
     
     ros::Timer m_timer;
-    bool m_send_display_flag;
+    ros::Time m_last_display_send_time;
 };
 
 
