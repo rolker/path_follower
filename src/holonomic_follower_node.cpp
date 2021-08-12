@@ -72,7 +72,7 @@ public:
         
         nh_private.param<std::string>("map_frame", m_map_frame, "map");
         nh_private.param<std::string>("base_frame", m_base_frame, "base_link");
-
+	
 	m_action_server.registerGoalCallback(
 	  boost::bind(&PathFollower::goalCallback, this));
         m_action_server.registerPreemptCallback(

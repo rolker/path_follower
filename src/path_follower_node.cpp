@@ -32,55 +32,84 @@ PathFollower::PathFollower(std::string name):
   m_current_segment_index(0),
   m_total_distance(0.0),
   m_cumulative_distance(0.0),
+  m_enabled(true),
   m_dynamics_mode(unicycle)
 {
 
+  // Initiate node and get parameters.
   ros::NodeHandle nh;
-  
-  this->m_enabled = true;
-  this->m_enable_sub = nh.subscribe<std_msgs::Bool>("enable", 10, [&](const std_msgs::BoolConstPtr& msg){this->m_enabled = msg->data; this->sendDisplay();});
-  
-  this->m_cmd_vel_pub = nh.advertise<geometry_msgs::TwistStamped>("cmd_vel",1);
-  
-  this->m_display_pub = nh.advertise<geographic_visualization_msgs::GeoVizItem>("project11/display",5);
-  this->m_vis_display.id = "path_follower";
-  
   ros::NodeHandle nh_private("~");
   
   nh_private.param<std::string>("map_frame", this->m_map_frame, "map");
   nh_private.param<std::string>("base_frame", this->m_base_frame, "base_link");
-  nh_private.param<std::string>("dynamics_mode", this->m_base_frame, "unicycle");
+  std::string dyn_mode_str;
+  nh_private.param<std::string>("dynamics_mode", dyn_mode_str ,
+				      "unicycle");
+  this->m_dynamics_mode = this->str2dynamicsmode(dyn_mode_str);
+  float update_rate;
+  nh_private.param<float>("update_rate", update_rate , 10.0);
+
+  // Subscribers
+  this->m_enable_sub = nh.subscribe<std_msgs::Bool>(
+    "enable", 10,
+    [&](const std_msgs::BoolConstPtr& msg){this->m_enabled =
+	msg->data; this->sendDisplay();});
+
+  // Publishers
+  this->m_cmd_vel_pub = nh.advertise<geometry_msgs::TwistStamped>("cmd_vel",1);
+  this->m_display_pub = nh.advertise<geographic_visualization_msgs::GeoVizItem>
+    ("project11/display",5);
+  this->m_vis_display.id = "path_follower";
   
-  this->m_setpoint_pub = nh_private.advertise<std_msgs::Float64>(
-    "crab_angle_pid/setpoint",1, true);
-  this->m_state_pub = nh_private.advertise<std_msgs::Float64>(
-    "crab_angle_pid/state",1);
-  this->m_control_effort_sub = nh_private.subscribe(
-    "crab_angle_pid/control_effort", 10,
-    &PathFollower::controlEfforCallback, this);
-  this->m_pid_enable_pub = nh_private.advertise<std_msgs::Bool>(
-    "crab_angle_pid/pid_enable", 1);
+  // Crab Angle PID pub/subs - only for unicycle mode
+  if (this->m_dynamics_mode == PathFollower::DynamicsMode::unicycle)
+  {
+    this->m_setpoint_pub = nh_private.advertise<std_msgs::Float64>(
+      "crab_angle_pid/setpoint",1, true);
+    this->m_state_pub = nh_private.advertise<std_msgs::Float64>(
+      "crab_angle_pid/state",1);
+    this->m_control_effort_sub = nh_private.subscribe(
+      "crab_angle_pid/control_effort", 10,
+      &PathFollower::controlEfforCallback, this);
+    this->m_pid_enable_pub = nh_private.advertise<std_msgs::Bool>(
+      "crab_angle_pid/pid_enable", 1);
+    std_msgs::Float64 setpoint;
+    setpoint.data = 0.0;
+    this->m_setpoint_pub.publish(setpoint);
+  }
   
-  std_msgs::Float64 setpoint;
-  setpoint.data = 0.0;
-  this->m_setpoint_pub.publish(setpoint);
-  
+  // Action server callbacks
   this->m_action_server.registerGoalCallback(
     boost::bind(&PathFollower::goalCallback, this));
   this->m_action_server.registerPreemptCallback(
     boost::bind(
       &PathFollower::preemptCallback, this));
   this->m_action_server.start();
-  
-  this->m_timer = nh.createTimer(ros::Duration(0.1),
-			   std::bind(&PathFollower::timerCallback,
-				     this, std::placeholders::_1));
+
+  // Updater
+  this->m_timer = nh.createTimer(ros::Duration(1.0/update_rate),
+				 std::bind(&PathFollower::timerCallback,
+					   this, std::placeholders::_1));
 }
     
 PathFollower::~PathFollower()
 {
 }
-    
+
+PathFollower::DynamicsMode PathFollower::str2dynamicsmode(std::string str)
+{
+  if (str == "unicycle")
+    return PathFollower::DynamicsMode::unicycle;
+  else if (str == "holonomic")
+    return PathFollower::DynamicsMode::holonomic;
+  else
+    ROS_FATAL_STREAM("path_follower_node: dynamics_mode <" << str <<
+		     "> is not recognized.  Shutting down");
+  ros::shutdown();
+  // This is just to avoid a compiler warning - should never get here.
+  return PathFollower::DynamicsMode::unicycle;
+}
+
 void PathFollower::goalCallback()
 {
   auto goal = this->m_action_server.acceptNewGoal();
@@ -93,7 +122,9 @@ void PathFollower::goalCallback()
   this->m_goal_path.clear();
   
   geometry_msgs::TransformStamped earth_to_map =
-    this->m_transforms().lookupTransform(this->m_map_frame, "earth", ros::Time(0));
+    this->m_transforms().lookupTransform(this->m_map_frame,
+					 "earth",
+					 ros::Time(0));
   
   geographic_visualization_msgs::GeoVizPointList gvpl;
   
@@ -203,9 +234,12 @@ void PathFollower::timerCallback(const ros::TimerEvent event)
     
     while(!found_current_segment)
     {
-      double dx = this->m_goal_path[this->m_current_segment_index].pose.position.x -
+      // Delta x and y in local/odom coordinates
+      double dx =
+	this->m_goal_path[this->m_current_segment_index].pose.position.x -
 	base_to_map.transform.translation.x;
-      double dy = this->m_goal_path[this->m_current_segment_index].pose.position.y -
+      double dy =
+	this->m_goal_path[this->m_current_segment_index].pose.position.y -
 	base_to_map.transform.translation.y;
       vehicle_distance = sqrt(dx*dx+dy*dy);
       

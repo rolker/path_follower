@@ -53,6 +53,15 @@ public:
   void timerCallback(const ros::TimerEvent event);
     
 private:
+  // Dynamics mode
+  enum DynamicsMode { unicycle, holonomic };
+  DynamicsMode m_dynamics_mode;
+
+  /**
+   * @brief Converts string (from ROS parameter) to mode enumeration.
+   */
+  PathFollower::DynamicsMode str2dynamicsmode(std::string str);
+  
   actionlib::SimpleActionServer<path_follower::path_followerAction>
     m_action_server;
 
@@ -95,9 +104,7 @@ private:
   
   ros::Timer m_timer;
   
-  // Dynamics mode
-  enum DynamicsMode { unicycle, holonomic };
-  DynamicsMode m_dynamics_mode;
+
 };
 
 #endif
