@@ -236,7 +236,9 @@ public:
           p11::AngleRadians heading = tf2::getYaw(base_to_map.transform.rotation);
           p11::AngleRadians target_heading = m_segment_azimuth_distances[m_current_segment_index].azimuth + m_crab_angle;
 
-          ts.twist.angular.z = p11::AngleRadiansZeroCentered(target_heading-heading).value();
+	  float Kp = 0.5;
+
+          ts.twist.angular.z = Kp * p11::AngleRadiansZeroCentered(target_heading-heading).value();
           ts.twist.linear.x = m_goal_speed;
 
           m_cmd_vel_pub.publish(ts);
