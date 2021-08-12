@@ -38,6 +38,12 @@ add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catk
 
 target_link_libraries(${PROJECT_NAME}_node
     ${catkin_LIBRARIES}
+    )
+
+add_executable(holonomic_follower_node src/holonomic_follower_node.cpp)
+add_dependencies(holonomic_follower_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(holonomic_follower_node
+    ${catkin_LIBRARIES}
 )
 
 add_executable(mpc_adapter_node src/mpc_adapter_node.cpp)
