@@ -242,7 +242,7 @@ public:
         {
             std_msgs::Bool pid_enable;
             pid_enable.data = false;
-            m_pid_enable_pub.publish(pid_enable);
+            //m_pid_enable_pub.publish(pid_enable);
         }
     }
     
