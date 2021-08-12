@@ -1,3 +1,29 @@
+/** 
+ * @file holonomic_follower_node.cpp
+ * 
+ * Modification of path_follower_node.cpp to allow for holonomic motion.
+ * Developed for GFOE R/V Annie with Blue Arrow DP.
+ * 
+ * Private Parameters:
+ *  - map_frame: 
+ *  - base_frame: 
+ *  - odom_frame:
+ *  - odom_topic:
+ *  - sensors: Used to specify the sensor object type - not sure if/how this is used.
+ * 
+ * Subscribes:
+ *  - 
+ *  -
+ * 
+ * Publishes:
+ *  - nav_msgs::Odometry on 'odom'
+ *  - sensor_msgs::NavSatFix on 'nav/position'
+ *  - sensor_msgs::Imu on 'nav/orientation'
+ *  - geometry_msgs::TwistWithCovarianceStamped on 'nav/velocity'
+ *  - std_msgs::String on 'nav/active_sensor'
+ *
+ */
+
 #include <vector>
 #include "ros/ros.h"
 #include "std_msgs/Float64.h"
