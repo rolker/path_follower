@@ -23,6 +23,8 @@
 #define PATH_FOLLOWER_NODE_H_
 
 #include <vector>
+#include <cmath>
+
 #include "ros/ros.h"
 #include "std_msgs/Float64.h"
 #include "std_msgs/Bool.h"
@@ -38,19 +40,13 @@ namespace p11 = project11;
 class PathFollower
 {
 public:
-  struct AzimuthDistance
-  {
-    p11::AngleRadians azimuth;
-    double distance;
-  };
   
   PathFollower(std::string name);
   ~PathFollower();
   void goalCallback();
   void preemptCallback();
-  void sendDisplay();
   void controlEfforCallback(const std_msgs::Float64::ConstPtr& inmsg);
-  void timerCallback(const ros::TimerEvent event);
+  
     
 private:
   // Dynamics mode
@@ -61,7 +57,17 @@ private:
    * @brief Converts string (from ROS parameter) to mode enumeration.
    */
   PathFollower::DynamicsMode str2dynamicsmode(std::string str);
-  
+
+  void sendDisplay();
+
+  void timerCallback(const ros::TimerEvent event);
+
+  /** @brief Holds the path bearing [rad, ENU] and distance [m] values. **/
+  struct AzimuthDistance
+  {
+    p11::AngleRadians azimuth;
+    double distance;
+  };
   actionlib::SimpleActionServer<path_follower::path_followerAction>
     m_action_server;
 
@@ -69,6 +75,13 @@ private:
 
   std::vector<AzimuthDistance> m_segment_azimuth_distances;
 
+
+  float m_kp_yaw;
+  float m_kp_surge;
+  float m_kp_sway;
+  bool m_turn_in_place;
+  float m_turn_in_place_threshold;
+  
   int m_current_segment_index;
 
   double m_goal_speed;
@@ -82,10 +95,10 @@ private:
   ros::Subscriber m_enable_sub;
   bool m_send_display_flag;
     
-  // output
+  // Pub
   ros::Publisher m_cmd_vel_pub;
   
-  // pid topics
+  // PID pub/subs
   ros::Publisher m_state_pub;
   ros::Publisher m_setpoint_pub;
   ros::Subscriber m_control_effort_sub;
