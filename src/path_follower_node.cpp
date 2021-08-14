@@ -82,9 +82,17 @@ public:
         
         for(auto pose: goal->path.poses)
         {
+          // See header files in project11 repo.
+          //  See: https://github.com/GFOE/project11/blob/dd6b840c342c62b69d0922bfb646c93fba807c55/include/project11/utils.h#L21
+	  // Which reassigns to this type: gz4d::GeoPointLatLongDegrees
+	  // See https://github.com/GFOE/project11/blob/dd6b840c342c62b69d0922bfb646c93fba807c55/include/project11/gz4d_geo.h#L1527
           p11::LatLongDegrees p;
+          // See: https://github.com/GFOE/project11/blob/dd6b840c342c62b69d0922bfb646c93fba807c55/include/project11/utils.h#L40
           p11::fromMsg(pose.pose.position, p);
+          // typedef gz4d::GeoPointECEF ECEF;
+          // Not clear how assigning ecef_point from latlon
           p11::ECEF ecef_point = p;
+          // Stuff into a message
           geometry_msgs::Point ecef_point_msg;
           p11::toMsg(ecef_point,ecef_point_msg);
           geometry_msgs::PoseStamped map_point;
