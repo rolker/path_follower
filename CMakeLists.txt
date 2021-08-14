@@ -21,10 +21,8 @@ add_action_files(DIRECTORY action FILES path_follower.action)
 generate_messages(DEPENDENCIES actionlib_msgs geographic_msgs)
 
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES asv_helm
+  INCLUDE_DIRS include
   CATKIN_DEPENDS geometry_msgs roscpp project11 geographic_visualization_msgs
-#  DEPENDS system_lib
 )
 
 include_directories(
@@ -37,6 +35,12 @@ add_executable(${PROJECT_NAME}_node src/path_follower_node.cpp)
 add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 target_link_libraries(${PROJECT_NAME}_node
+    ${catkin_LIBRARIES}
+    )
+
+add_executable(holonomic_follower_node src/holonomic_follower_node.cpp)
+add_dependencies(holonomic_follower_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(holonomic_follower_node
     ${catkin_LIBRARIES}
 )
 
