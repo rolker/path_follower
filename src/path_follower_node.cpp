@@ -385,14 +385,15 @@ void PathFollower::timerCallback(const ros::TimerEvent event)
       ts.twist.linear.x = std::min(this->m_kp_surge * dist_goal,
 				   this->m_goal_speed);
       // Sway: Proporational to cross track error
-      ts.twist.linear.y = -1.0 * std::copysign(this->m_kp_sway * cross_track,
+      ts.twist.linear.y = 1.0 * std::copysign(this->m_kp_sway * cross_track,
 					       error_azimuth.value());
 
       // If turn in place, then reduce surge if we have large yaw error
       if (std::abs(hdg_error.value())*180.0/M_PI >
 	  this->m_turn_in_place_threshold)
       {
-	ts.twist.linear.x = 0.0;  
+	ts.twist.linear.x = 0.0;
+	ts.twist.linear.y = 0.0;  
       }
       ROS_DEBUG("hdg_error: %.1f deg, yaw_rate: %.1f rad/s, "
 		"dist_goal: %.1f m, surge: %.1f m/s, "
