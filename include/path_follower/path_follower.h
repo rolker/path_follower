@@ -30,8 +30,6 @@
 #include "std_msgs/Bool.h"
 #include "geometry_msgs/TwistStamped.h"
 #include "geographic_visualization_msgs/GeoVizItem.h"
-#include "path_follower/path_followerAction.h"
-#include "actionlib/server/simple_action_server.h"
 #include "project11/utils.h"
 #include "project11/tf2_utils.h"
 
@@ -43,12 +41,19 @@ public:
   
   PathFollower(std::string name);
   ~PathFollower();
-  void goalCallback();
-  void preemptCallback();
-  void controlEfforCallback(const std_msgs::Float64::ConstPtr& inmsg);
-  
-    
+
+protected:
+  void initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_private, const tf2_ros::Buffer *tf);
+  bool generateCommands(geometry_msgs::Twist &cmd_vel);
+  void setGoal(const std::vector< geometry_msgs::PoseStamped > & 	plan, double speed=0.0);
+  double crossTrackError() const;
+  double progress() const;
+
+  std::string m_base_frame;
+
 private:
+  void controlEfforCallback(const std_msgs::Float64::ConstPtr& inmsg);
+
   // Dynamics mode
   enum DynamicsMode { unicycle, holonomic };
   DynamicsMode m_dynamics_mode;
@@ -58,9 +63,6 @@ private:
    */
   PathFollower::DynamicsMode str2dynamicsmode(std::string str);
 
-  void sendDisplay();
-
-  void timerCallback(const ros::TimerEvent event);
 
   /** @brief Holds the path bearing [rad, ENU] and distance [m] values. **/
   struct AzimuthDistance
@@ -68,8 +70,6 @@ private:
     p11::AngleRadians azimuth;
     double distance;
   };
-  actionlib::SimpleActionServer<path_follower::path_followerAction>
-    m_action_server;
 
   std::vector<geometry_msgs::PoseStamped> m_goal_path;
 
@@ -90,13 +90,9 @@ private:
     
   double m_total_distance; // total distance of complete path in meters.
   double m_cumulative_distance; // distance of completed segments in meters.
+  double m_current_segment_progress; // distance of completed progress for current segment in meters.
+  double m_cross_track_error; // cross-track distance in meters. 
 
-  bool m_enabled;
-  ros::Subscriber m_enable_sub;
-  bool m_send_display_flag;
-    
-  // Pub
-  ros::Publisher m_cmd_vel_pub;
   
   // PID pub/subs
   ros::Publisher m_state_pub;
@@ -104,20 +100,7 @@ private:
   ros::Subscriber m_control_effort_sub;
   ros::Publisher m_pid_enable_pub;
   
-  // display
-  ros::Publisher m_display_pub;
-  geographic_visualization_msgs::GeoVizItem m_vis_display;
-  ros::Time m_last_display_send_time;
-  
-  // tf frames
-  std::string m_map_frame;
-  std::string m_base_frame;
-  
-  p11::Transformations m_transforms;
-  
-  ros::Timer m_timer;
-  
-
+  const tf2_ros::Buffer *m_tf_buffer = nullptr;
 };
 
 #endif

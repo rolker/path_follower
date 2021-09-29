@@ -9,7 +9,7 @@
 namespace p11 = project11;
 
 extern "C" {
-    #include "dubins.h"
+    #include "dubins_curves/dubins.h"
 }
 
 struct State
