@@ -2,7 +2,6 @@
 
 
 PathFollowerAction::PathFollowerAction(std::string name):
-  PathFollower(name),
   action_server_(ros::NodeHandle(), name, false),
   enabled_(true)
 {

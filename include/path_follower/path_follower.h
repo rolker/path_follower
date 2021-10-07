@@ -39,7 +39,7 @@ class PathFollower
 {
 public:
   
-  PathFollower(std::string name);
+  PathFollower();
   ~PathFollower();
 
 protected:
@@ -48,6 +48,8 @@ protected:
   void setGoal(const std::vector< geometry_msgs::PoseStamped > & 	plan, double speed=0.0);
   double crossTrackError() const;
   double progress() const;
+  bool goalReached() const;
+  double distanceRemaining() const;
 
   std::string m_base_frame;
 

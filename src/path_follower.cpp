@@ -26,7 +26,7 @@
 
 namespace p11 = project11;
 
-PathFollower::PathFollower(std::string name):
+PathFollower::PathFollower():
   m_goal_speed(0.0),
   m_crab_angle(0.0),
   m_current_segment_index(0),
@@ -139,7 +139,7 @@ bool PathFollower::generateCommands(geometry_msgs::Twist &cmd_vel)
     try
     {
       base_to_map = this->m_tf_buffer->lookupTransform(
-  m_goal_path[0].header.frame_id, this->m_base_frame, ros::Time(0));
+        m_goal_path[0].header.frame_id, this->m_base_frame, ros::Time(0));
     }
     catch (tf2::TransformException &ex)
     {
@@ -157,17 +157,20 @@ bool PathFollower::generateCommands(geometry_msgs::Twist &cmd_vel)
     // For readability, define current segment azimuth and distance vars.
     p11::AngleRadians curr_seg_azi(0.0);
     double curr_seg_dist = 0.0;
+
+    ros::Time now = ros::Time::now();
+
     while(!found_current_segment)
     {
       // For hover, dx/dy is the distance:
       // From: start point of the path (where the vehicle started)
       // To: vehicle positon
       double dx =
-  this->m_goal_path[this->m_current_segment_index].pose.position.x -
-  base_to_map.transform.translation.x;
+        this->m_goal_path[this->m_current_segment_index].pose.position.x -
+        base_to_map.transform.translation.x;
       double dy =
-  this->m_goal_path[this->m_current_segment_index].pose.position.y -
-  base_to_map.transform.translation.y;
+        this->m_goal_path[this->m_current_segment_index].pose.position.y -
+        base_to_map.transform.translation.y;
       vehicle_distance = sqrt(dx*dx+dy*dy);
       ROS_DEBUG_NAMED("path_follower_node",
           "path.x: %.1f, veh.x: %.1f, path.y: %.1f, veh.y: %.1f, "
@@ -186,11 +189,11 @@ bool PathFollower::generateCommands(geometry_msgs::Twist &cmd_vel)
 
       // For readability, define current segment azimuth and distance vars.
       curr_seg_azi =
-  this->m_segment_azimuth_distances[this->m_current_segment_index].
-  azimuth;
+        this->m_segment_azimuth_distances[this->m_current_segment_index].
+        azimuth;
       curr_seg_dist =
-  this->m_segment_azimuth_distances[this->m_current_segment_index].
-  distance;
+        this->m_segment_azimuth_distances[this->m_current_segment_index].
+        distance;
 
       error_azimuth = azimuth - curr_seg_azi;
       
@@ -209,21 +212,43 @@ bool PathFollower::generateCommands(geometry_msgs::Twist &cmd_vel)
           curr_seg_dist, progress);
 
       // Have we completed this segment?
-      if (progress >= curr_seg_dist)
+      // If using path timestamps for speed, advance using timestamps
+      if (m_goal_speed == 0.0)
       {
-        this->m_cumulative_distance += curr_seg_dist;
-        this->m_current_segment_index += 1;
-        // have we reached the last segment?
-        if(this->m_current_segment_index >= this->m_goal_path.size()-1)
+        if(m_goal_path[m_current_segment_index+1].header.stamp < now)
         {
-          return false;
+          m_cumulative_distance += curr_seg_dist;
+          m_current_segment_index += 1;
+          if(this->m_current_segment_index >= this->m_goal_path.size()-1)
+          {
+            m_current_segment_progress = 0;
+            return false;
+          }
         }
+        else
+        {
+          m_current_segment_progress = progress;
+          found_current_segment = true;
+        }
+
       }
       else
-      {
-        m_current_segment_progress = progress;
-        found_current_segment = true;
-      }
+        if (progress >= curr_seg_dist)
+        {
+          this->m_cumulative_distance += curr_seg_dist;
+          this->m_current_segment_index += 1;
+          // have we reached the last segment?
+          if(this->m_current_segment_index >= this->m_goal_path.size()-1)
+          {
+            m_current_segment_progress = 0;
+            return false;
+          }
+        }
+        else
+        {
+          m_current_segment_progress = progress;
+          found_current_segment = true;
+        }
     }
 
     // Distance away from line, m
@@ -246,7 +271,6 @@ bool PathFollower::generateCommands(geometry_msgs::Twist &cmd_vel)
       this->m_state_pub.publish(state);
     }
     
-    ros::Time now = ros::Time::now();
     
     p11::AngleRadians heading = tf2::getYaw(base_to_map.transform.rotation);
 
@@ -255,8 +279,26 @@ bool PathFollower::generateCommands(geometry_msgs::Twist &cmd_vel)
     {
       p11::AngleRadians target_heading = curr_seg_azi +	this->m_crab_angle;
       cmd_vel.angular.z =
-  p11::AngleRadiansZeroCentered(target_heading-heading).value();
-      cmd_vel.linear.x = this->m_goal_speed;
+        p11::AngleRadiansZeroCentered(target_heading-heading).value();
+      if(m_goal_speed == 0.0)
+      {
+        double dx_goal = m_goal_path[m_current_segment_index+1].pose.position.x -
+            base_to_map.transform.translation.x;
+        double dy_goal = m_goal_path[m_current_segment_index+1].pose.position.y -
+            base_to_map.transform.translation.y;
+        double dist_goal = sqrt(dx_goal * dx_goal + dy_goal * dy_goal);
+        ros::Duration dt = m_goal_path[m_current_segment_index+1].header.stamp - now;
+        if(dt < ros::Duration(0.0)) // we are late
+          dt = ros::Duration(1.0); // try to get there in one second
+        double speed = dist_goal/dt.toSec();
+        ROS_INFO_STREAM_THROTTLE(2.0, "speed: " << speed << " now: " << now);
+        if (speed > 0.0)
+          cmd_vel.linear.x = speed;  
+        else
+          cmd_vel.linear.x = 1.0;
+      }
+      else
+        cmd_vel.linear.x = this->m_goal_speed;
       return true;
     }
     else if (this->m_dynamics_mode == PathFollower::DynamicsMode::holonomic)
@@ -270,11 +312,11 @@ bool PathFollower::generateCommands(geometry_msgs::Twist &cmd_vel)
       // Surge: target speed and then slow down when we are close.
       // Find distance to end of path
       double dx_goal =
-  this->m_goal_path[this->m_current_segment_index+1].pose.position.x -
-  base_to_map.transform.translation.x;
+       this->m_goal_path[this->m_current_segment_index+1].pose.position.x -
+        base_to_map.transform.translation.x;
       double dy_goal =
-  this->m_goal_path[this->m_current_segment_index+1].pose.position.y -
-  base_to_map.transform.translation.y;
+        this->m_goal_path[this->m_current_segment_index+1].pose.position.y -
+        base_to_map.transform.translation.y;
       double dist_goal = sqrt(dx_goal * dx_goal + dy_goal * dy_goal);
       cmd_vel.linear.x = std::min(this->m_kp_surge * dist_goal,
             this->m_goal_speed);
@@ -284,17 +326,17 @@ bool PathFollower::generateCommands(geometry_msgs::Twist &cmd_vel)
 
       // If turn in place, then reduce surge if we have large yaw error
       if (std::abs(hdg_error.value())*180.0/M_PI >
-    this->m_turn_in_place_threshold)
+        this->m_turn_in_place_threshold)
       {
         cmd_vel.linear.x = 0.0;
         cmd_vel.linear.y = 0.0;  
       }
       ROS_DEBUG("hdg_error: %.1f deg, yaw_rate: %.1f rad/s, "
-    "dist_goal: %.1f m, surge: %.1f m/s, "
-    "xtrack_err: %.1f m, sway: %.1f m/s, ",
-      hdg_error.value(), cmd_vel.angular.z,
-      dist_goal, cmd_vel.linear.x,
-      m_cross_track_error, cmd_vel.linear.y);
+        "dist_goal: %.1f m, surge: %.1f m/s, "
+        "xtrack_err: %.1f m, sway: %.1f m/s, ",
+        hdg_error.value(), cmd_vel.angular.z,
+        dist_goal, cmd_vel.linear.x,
+        m_cross_track_error, cmd_vel.linear.y);
       return true;
     }
     else
@@ -328,3 +370,15 @@ double PathFollower::crossTrackError() const
 {
   return m_cross_track_error;
 }    
+
+bool PathFollower::goalReached() const
+{
+  return !m_goal_path.empty() && m_current_segment_index >= m_goal_path.size()-1;
+}
+
+double PathFollower::distanceRemaining() const
+{
+  if(m_total_distance>0.0)
+    return m_total_distance - m_cumulative_distance - m_current_segment_progress;
+  return 0.0;
+}
