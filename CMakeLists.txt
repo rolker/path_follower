@@ -25,7 +25,7 @@ generate_messages(DEPENDENCIES actionlib_msgs geographic_msgs)
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES path_follower_plugin
-  CATKIN_DEPENDS geometry_msgs nav_core roscpp project11 geographic_visualization_msgs
+  CATKIN_DEPENDS base_local_planner geometry_msgs nav_core roscpp project11 geographic_visualization_msgs 
 )
 
 include_directories(

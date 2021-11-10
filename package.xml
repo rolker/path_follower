@@ -11,6 +11,7 @@
   <buildtool_depend>catkin</buildtool_depend>
   <depend>actionlib</depend>
   <depend>actionlib_msgs</depend>
+  <depend>base_local_planner</depend>
   <depend>geometry_msgs</depend>
   <depend>geographic_visualization_msgs</depend>
   <depend>geographic_msgs</depend>
