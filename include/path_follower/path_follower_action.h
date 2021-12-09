@@ -15,7 +15,6 @@ public:
   void preemptCallback();
 
 private:
-  void sendDisplay();
   void timerCallback(const ros::TimerEvent event);
 
   actionlib::SimpleActionServer<path_follower::path_followerAction> action_server_;
@@ -29,11 +28,6 @@ private:
 
   p11::Transformations transforms_;
   ros::Timer timer_;
-
-  // display
-  ros::Publisher display_pub_;
-  geographic_visualization_msgs::GeoVizItem vis_display_;
-  ros::Time last_display_send_time_;
 
   // tf frames
   std::string map_frame_;

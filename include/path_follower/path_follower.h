@@ -50,9 +50,12 @@ protected:
   double progress() const;
   bool goalReached() const;
   double distanceRemaining() const;
+  void sendDisplay(bool dim=false);
 
   std::string m_base_frame;
+  geographic_visualization_msgs::GeoVizItem vis_display_;
 
+  const tf2_ros::Buffer *m_tf_buffer = nullptr;
 private:
   void controlEfforCallback(const std_msgs::Float64::ConstPtr& inmsg);
 
@@ -102,7 +105,9 @@ private:
   ros::Subscriber m_control_effort_sub;
   ros::Publisher m_pid_enable_pub;
   
-  const tf2_ros::Buffer *m_tf_buffer = nullptr;
+  // display
+  ros::Publisher display_pub_;
+
 };
 
 #endif

@@ -23,9 +23,6 @@ PathFollowerAction::PathFollowerAction(std::string name):
   // Publishers
   cmd_vel_pub_ = nh.advertise<geometry_msgs::TwistStamped>("cmd_vel",1);
 
-  display_pub_ = nh.advertise<geographic_visualization_msgs::GeoVizItem>
-    ("project11/display",5);
-  vis_display_.id = "path_follower";
 
   // Action server callbacks
   action_server_.registerGoalCallback(
@@ -99,56 +96,31 @@ void PathFollowerAction::preemptCallback()
 
 void PathFollowerAction::timerCallback(const ros::TimerEvent event)
 {
-  if(ros::Time::now() - last_display_send_time_ > ros::Duration(1.0))
-    sendDisplay();
-  if(action_server_.isActive() && enabled_)
-  {
-    geometry_msgs::TwistStamped ts;
-    ts.header.frame_id = m_base_frame;
-    ts.header.stamp = event.current_real;
-    if(generateCommands(ts.twist))
-      cmd_vel_pub_.publish(ts);
-    else
+  if(action_server_.isActive())
+    if(enabled_)
     {
-      path_follower::path_followerResult result;
-      result.ending_pose.position =
-      transforms_.map_to_wgs84(geometry_msgs::Point(), this->m_base_frame);
-      action_server_.setSucceeded(result);
+      geometry_msgs::TwistStamped ts;
+      ts.header.frame_id = m_base_frame;
+      ts.header.stamp = event.current_real;
+      if(generateCommands(ts.twist))
+        cmd_vel_pub_.publish(ts);
+      else
+      {
+        path_follower::path_followerResult result;
+        result.ending_pose.position =
+        transforms_.map_to_wgs84(geometry_msgs::Point(), this->m_base_frame);
+        action_server_.setSucceeded(result);
+      }
+
+      // Publish action feedback
+      path_follower::path_followerFeedback feedback;
+      feedback.percent_complete = progress();
+      feedback.crosstrack_error = crossTrackError();
+      action_server_.publishFeedback(feedback);
       sendDisplay();
     }
-
-    // Publish action feedback
-    path_follower::path_followerFeedback feedback;
-    feedback.percent_complete = progress();
-    feedback.crosstrack_error = crossTrackError();
-    action_server_.publishFeedback(feedback);
-  }
-}
-
-
-void PathFollowerAction::sendDisplay()
-{
-  if(!this->vis_display_.lines.empty())
-  {
-    auto& plist = this->vis_display_.lines.front();
-    plist.size = 5.0;
-    if (this->enabled_)
-    {
-      plist.color.r = 1.0;
-      plist.color.g = 0.0;
-      plist.color.b = 0.0;
-      plist.color.a = 1.0;
-    }
     else
-    {
-      plist.color.r = 0.5;
-      plist.color.g = 0.0;
-      plist.color.b = 0.0;
-      plist.color.a = 0.5;
-    }
-  }
-  this->display_pub_.publish(this->vis_display_);
-  last_display_send_time_ = ros::Time::now();
+      sendDisplay(false);
 }
 
 

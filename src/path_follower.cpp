@@ -53,6 +53,7 @@ void PathFollower::initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_private, 
   // Initiate node and get parameters.
   nh_private.param<std::string>("base_frame", this->m_base_frame, "base_link");
 
+  
   std::string dyn_mode_str;
   nh_private.param<std::string>("dynamics_mode", dyn_mode_str ,
 				      "unicycle");
@@ -83,7 +84,11 @@ void PathFollower::initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_private, 
     setpoint.data = 0.0;
     this->m_setpoint_pub.publish(setpoint);
   }
-  
+
+  display_pub_ = nh.advertise<geographic_visualization_msgs::GeoVizItem>
+    ("project11/display",5);
+  vis_display_.id = "path_follower";
+
 }
     
 
@@ -110,7 +115,7 @@ void PathFollower::setGoal(const std::vector< geometry_msgs::PoseStamped > & 	pl
   this->m_cumulative_distance = 0.0;
   this->m_current_segment_progress = 0.0;
   this->m_segment_azimuth_distances.clear();
-  for(int i = 0; i < this->m_goal_path.size()-1; i++)
+  for(int i = 0; i+i < this->m_goal_path.size(); i++)
   {
     AzimuthDistance ad;
     double dx = this->m_goal_path[i+1].pose.position.x -
@@ -143,7 +148,7 @@ bool PathFollower::generateCommands(geometry_msgs::Twist &cmd_vel)
     }
     catch (tf2::TransformException &ex)
     {
-      ROS_WARN_STREAM("timerCallback: " << ex.what());
+      ROS_WARN_STREAM("PathFollower::generateCommands: " << ex.what());
     }
   
     double vehicle_distance;
@@ -212,43 +217,27 @@ bool PathFollower::generateCommands(geometry_msgs::Twist &cmd_vel)
           curr_seg_dist, progress);
 
       // Have we completed this segment?
-      // If using path timestamps for speed, advance using timestamps
+      bool segment_complete;
       if (m_goal_speed == 0.0)
-      {
-        if(m_goal_path[m_current_segment_index+1].header.stamp < now)
-        {
-          m_cumulative_distance += curr_seg_dist;
-          m_current_segment_index += 1;
-          if(this->m_current_segment_index >= this->m_goal_path.size()-1)
-          {
-            m_current_segment_progress = 0;
-            return false;
-          }
-        }
-        else
-        {
-          m_current_segment_progress = progress;
-          found_current_segment = true;
-        }
+        segment_complete = m_goal_path[m_current_segment_index+1].header.stamp < now; // time based
+      else
+        segment_complete = progress >= curr_seg_dist; // distance based
 
+      if(segment_complete)
+      {
+        m_cumulative_distance += curr_seg_dist;
+        m_current_segment_index += 1;
+        if(this->m_current_segment_index >= this->m_goal_path.size()-1)
+        {
+          m_current_segment_progress = 0;
+          return false;
+        }
       }
       else
-        if (progress >= curr_seg_dist)
-        {
-          this->m_cumulative_distance += curr_seg_dist;
-          this->m_current_segment_index += 1;
-          // have we reached the last segment?
-          if(this->m_current_segment_index >= this->m_goal_path.size()-1)
-          {
-            m_current_segment_progress = 0;
-            return false;
-          }
-        }
-        else
-        {
-          m_current_segment_progress = progress;
-          found_current_segment = true;
-        }
+      {
+        m_current_segment_progress = progress;
+        found_current_segment = true;
+      }
     }
 
     // Distance away from line, m
@@ -280,25 +269,24 @@ bool PathFollower::generateCommands(geometry_msgs::Twist &cmd_vel)
       p11::AngleRadians target_heading = curr_seg_azi +	this->m_crab_angle;
       cmd_vel.angular.z =
         p11::AngleRadiansZeroCentered(target_heading-heading).value();
+      double target_speed = m_goal_speed;
       if(m_goal_speed == 0.0)
       {
-        double dx_goal = m_goal_path[m_current_segment_index+1].pose.position.x -
-            base_to_map.transform.translation.x;
-        double dy_goal = m_goal_path[m_current_segment_index+1].pose.position.y -
-            base_to_map.transform.translation.y;
-        double dist_goal = sqrt(dx_goal * dx_goal + dy_goal * dy_goal);
-        ros::Duration dt = m_goal_path[m_current_segment_index+1].header.stamp - now;
-        if(dt < ros::Duration(0.0)) // we are late
-          dt = ros::Duration(1.0); // try to get there in one second
-        double speed = dist_goal/dt.toSec();
-        ROS_INFO_STREAM_THROTTLE(2.0, "speed: " << speed << " now: " << now);
-        if (speed > 0.0)
-          cmd_vel.linear.x = speed;  
-        else
-          cmd_vel.linear.x = 1.0;
+        // make sure we are not ahead of schedule
+        if(progress < curr_seg_dist)
+        {
+          ros::Duration dt = m_goal_path[m_current_segment_index+1].header.stamp - now;
+          if(dt < ros::Duration(0.0)) // we are late
+            dt = ros::Duration(1.0); // try to get there in one second
+          target_speed = (curr_seg_dist - progress)/dt.toSec();
+        }
       }
-      else
-        cmd_vel.linear.x = this->m_goal_speed;
+
+      double cos_crab = std::max(cos(m_crab_angle), 0.5);
+      //ROS_INFO_STREAM_THROTTLE(1.0, "target speed along track: " << target_speed << " accounting for crab: " << target_speed/cos_crab << " cos crab: " << cos_crab);
+
+
+      cmd_vel.linear.x = target_speed/cos_crab;
       return true;
     }
     else if (this->m_dynamics_mode == PathFollower::DynamicsMode::holonomic)
@@ -382,3 +370,53 @@ double PathFollower::distanceRemaining() const
     return m_total_distance - m_cumulative_distance - m_current_segment_progress;
   return 0.0;
 }
+
+
+void PathFollower::sendDisplay(bool dim)
+{
+  if(!this->vis_display_.lines.empty())
+  {
+    double intensity = 1.0;
+    if(dim)
+      intensity = 0.5;
+
+    geographic_visualization_msgs::GeoVizPointList past_segments;
+    past_segments.size = 5.0;
+    past_segments.color.r = 0.5*intensity;
+    past_segments.color.g = 0.5*intensity;
+    past_segments.color.b = 0.5*intensity;
+    past_segments.color.a = 1.0*intensity;
+    geographic_visualization_msgs::GeoVizPointList current_segments;
+    current_segments.size = 7.0;
+    current_segments.color.r = 0.0*intensity;
+    current_segments.color.g = 1.0*intensity;
+    current_segments.color.b = 0.0*intensity;
+    current_segments.color.a = 1.0*intensity;
+    geographic_visualization_msgs::GeoVizPointList future_segments;
+    future_segments.size = 5.0;
+    future_segments.color.r = 0.0*intensity;
+    future_segments.color.g = 0.0*intensity;
+    future_segments.color.b = 1.0*intensity;
+    future_segments.color.a = 1.0*intensity;
+
+
+    auto& plist = this->vis_display_.lines.front();
+    for(int i = 0; i < plist.points.size() && i <= m_current_segment_index; i++)
+      past_segments.points.push_back(plist.points[i]);
+    for(int i = m_current_segment_index; i < plist.points.size() && i <= m_current_segment_index+1; i++)
+      current_segments.points.push_back(plist.points[i]);
+    for(int i = m_current_segment_index+1; i < plist.points.size(); i++)
+      future_segments.points.push_back(plist.points[i]);
+
+    geographic_visualization_msgs::GeoVizItem display;
+    display.id = vis_display_.id;
+    display.lines.push_back(past_segments);
+    display.lines.push_back(current_segments);
+    display.lines.push_back(future_segments);
+    display_pub_.publish(display);
+  }
+  else
+    this->display_pub_.publish(this->vis_display_);
+}
+
+
