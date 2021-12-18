@@ -115,7 +115,7 @@ void PathFollower::setGoal(const std::vector< geometry_msgs::PoseStamped > & 	pl
   this->m_cumulative_distance = 0.0;
   this->m_current_segment_progress = 0.0;
   this->m_segment_azimuth_distances.clear();
-  for(int i = 0; i+i < this->m_goal_path.size(); i++)
+  for(int i = 0; i+1 < this->m_goal_path.size(); i++)
   {
     AzimuthDistance ad;
     double dx = this->m_goal_path[i+1].pose.position.x -
@@ -201,6 +201,7 @@ bool PathFollower::generateCommands(geometry_msgs::Twist &cmd_vel)
         distance;
 
       error_azimuth = azimuth - curr_seg_azi;
+
       
       sin_error_azimuth = sin(error_azimuth);
       cos_error_azimuth = cos(error_azimuth);
@@ -215,6 +216,8 @@ bool PathFollower::generateCommands(geometry_msgs::Twist &cmd_vel)
           (double)curr_seg_azi*180.0/M_PI,
           (double)error_azimuth*180.0/M_PI,
           curr_seg_dist, progress);
+
+      //ROS_INFO_STREAM("azimuth: " << azimuth << " seg index: " << m_current_segment_index << " seg azimuth: " << curr_seg_azi << " error azimuth: " << error_azimuth << " progress: " << progress);
 
       // Have we completed this segment?
       bool segment_complete;
