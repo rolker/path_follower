@@ -1,5 +1,5 @@
 <library path="lib/libpath_follower_plugin">
-  <class name="path_follower/PathFollower" type="path_follower_planner::PathFollowerPlugin" base_class_type="nav_core::BaseLocalPlanner">
+  <class name="path_follower/PathFollowerPlanner" type="path_follower_planner::PathFollowerPlugin" base_class_type="nav_core::BaseLocalPlanner">
     <description>
       A local planner that follows a path minimizing cross-track error.
     </description>

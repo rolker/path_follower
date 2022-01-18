@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   nav_msgs
   path_planner_common
   project11
+  project11_navigation
   roscpp
 )
 
@@ -25,7 +26,7 @@ generate_messages(DEPENDENCIES actionlib_msgs geographic_msgs)
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES path_follower_plugin
-  CATKIN_DEPENDS base_local_planner geometry_msgs nav_core roscpp project11 geographic_visualization_msgs 
+  CATKIN_DEPENDS base_local_planner geometry_msgs nav_core roscpp project11 project11_navigation  geographic_visualization_msgs
 )
 
 include_directories(
@@ -52,6 +53,11 @@ target_link_libraries(mpc_adapter_node
 add_library(path_follower_plugin src/path_follower.cpp src/path_follower_plugin.cpp)
 add_dependencies(path_follower_plugin ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(path_follower_plugin ${catkin_LIBRARIES})
+
+add_library(path_follower_nav_plugin src/path_follower.cpp src/path_follower_nav_plugin.cpp)
+add_dependencies(path_follower_nav_plugin ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(path_follower_nav_plugin ${catkin_LIBRARIES})
+
 
 install(TARGETS ${PROJECT_NAME}_node path_follower_plugin
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}

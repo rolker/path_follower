@@ -374,6 +374,38 @@ double PathFollower::distanceRemaining() const
   return 0.0;
 }
 
+void PathFollower::updateDisplay()
+{
+  vis_display_.lines.clear();
+  if(!m_goal_path.empty() and m_tf_buffer)
+  {
+    try
+    {
+      geometry_msgs::TransformStamped map_to_earth = m_tf_buffer->lookupTransform("earth", m_goal_path.front().header.frame_id, ros::Time(0));
+
+      geographic_visualization_msgs::GeoVizPointList gvpl;
+
+      for(const auto& map_point: m_goal_path)
+      {
+        geometry_msgs::Point ecef_point_msg;
+        tf2::doTransform(map_point.pose.position, ecef_point_msg, map_to_earth);
+        p11::ECEF ecef_point;
+        p11::fromMsg(ecef_point_msg, ecef_point);
+        p11::LatLongDegrees ll_point = ecef_point;
+        geographic_msgs::GeoPoint gp;
+        p11::toMsg(ll_point, gp);
+        gvpl.points.push_back(gp);
+      }
+      vis_display_.lines.push_back(gvpl);
+    }
+    catch (tf2::TransformException &ex)
+    {
+      ROS_WARN_STREAM("Unable to find transform to generate display: " << ex.what());
+    }
+
+  }
+  sendDisplay();
+}
 
 void PathFollower::sendDisplay(bool dim)
 {

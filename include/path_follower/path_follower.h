@@ -50,6 +50,7 @@ protected:
   double progress() const;
   bool goalReached() const;
   double distanceRemaining() const;
+  void updateDisplay();
   void sendDisplay(bool dim=false);
 
   std::string m_base_frame;
