@@ -66,23 +66,11 @@ void PathFollower::initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_private, 
   nh_private.param<float>("turn_in_place_threshold",
 			  this->m_turn_in_place_threshold , 20.0);
 
-
-  
   // Crab Angle PID pub/subs - only for unicycle mode
   if (this->m_dynamics_mode == PathFollower::DynamicsMode::unicycle)
   {
-    this->m_setpoint_pub = nh_private.advertise<std_msgs::Float64>(
-      "crab_angle_pid/setpoint",1, true);
-    this->m_state_pub = nh_private.advertise<std_msgs::Float64>(
-      "crab_angle_pid/state",1);
-    this->m_control_effort_sub = nh_private.subscribe(
-      "crab_angle_pid/control_effort", 10,
-      &PathFollower::controlEfforCallback, this);
-    this->m_pid_enable_pub = nh_private.advertise<std_msgs::Bool>(
-      "crab_angle_pid/pid_enable", 1);
-    std_msgs::Float64 setpoint;
-    setpoint.data = 0.0;
-    this->m_setpoint_pub.publish(setpoint);
+    ros::NodeHandle pid_nh(nh_private.getNamespace()+"/pid");
+    m_pid.configure(pid_nh);
   }
 
   display_pub_ = nh.advertise<geographic_visualization_msgs::GeoVizItem>
@@ -128,13 +116,6 @@ void PathFollower::setGoal(const std::vector< geometry_msgs::PoseStamped > & 	pl
     this->m_segment_azimuth_distances.push_back(ad);
   }
 }
-
-
-void PathFollower::controlEfforCallback(const std_msgs::Float64::ConstPtr& inmsg)
-{
-  this->m_crab_angle = p11::AngleDegrees(inmsg->data);
-}
-
 
 bool PathFollower::generateCommands(geometry_msgs::Twist &cmd_vel)
 {
@@ -250,17 +231,7 @@ bool PathFollower::generateCommands(geometry_msgs::Twist &cmd_vel)
     // Cross track PID for unicycle mode.
     if (this->m_dynamics_mode == PathFollower::DynamicsMode::unicycle)
     {
-      std_msgs::Bool pid_enable;
-      pid_enable.data = true;
-      this->m_pid_enable_pub.publish(pid_enable);
-      
-      std_msgs::Float64 setpoint;
-      setpoint.data = 0.0;
-      this->m_setpoint_pub.publish(setpoint);
-      
-      std_msgs::Float64 state;
-      state.data = m_cross_track_error;
-      this->m_state_pub.publish(state);
+      m_crab_angle = p11::AngleDegrees(m_pid.update(m_cross_track_error, now));
     }
     
     
@@ -334,17 +305,6 @@ bool PathFollower::generateCommands(geometry_msgs::Twist &cmd_vel)
     {
       ROS_FATAL_NAMED("path_follower_node",
           "Unrecognized DynamicsMode!");
-    }
-  }
-  // If action server is inactive or the control is disabled or no more points
-  else  
-  {
-    // Cross track PID
-    if (this->m_dynamics_mode == PathFollower::DynamicsMode::unicycle)
-    {
-      std_msgs::Bool pid_enable;
-      pid_enable.data = false;
-      this->m_pid_enable_pub.publish(pid_enable);
     }
   }
   return false;

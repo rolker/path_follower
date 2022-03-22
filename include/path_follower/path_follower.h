@@ -32,6 +32,7 @@
 #include "geographic_visualization_msgs/GeoVizItem.h"
 #include "project11/utils.h"
 #include "project11/tf2_utils.h"
+#include "project11/pid.h"
 
 namespace p11 = project11;
 
@@ -58,7 +59,6 @@ protected:
 
   const tf2_ros::Buffer *m_tf_buffer = nullptr;
 private:
-  void controlEfforCallback(const std_msgs::Float64::ConstPtr& inmsg);
 
   // Dynamics mode
   enum DynamicsMode { unicycle, holonomic };
@@ -99,12 +99,7 @@ private:
   double m_current_segment_progress; // distance of completed progress for current segment in meters.
   double m_cross_track_error; // cross-track distance in meters. 
 
-  
-  // PID pub/subs
-  ros::Publisher m_state_pub;
-  ros::Publisher m_setpoint_pub;
-  ros::Subscriber m_control_effort_sub;
-  ros::Publisher m_pid_enable_pub;
+  p11::PID m_pid;
   
   // display
   ros::Publisher display_pub_;
