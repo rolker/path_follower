@@ -14,7 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   geographic_msgs
   nav_core
   nav_msgs
-  path_planner_common
+  alex_path_planner_common
   project11
   project11_navigation
   roscpp

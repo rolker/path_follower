@@ -17,7 +17,7 @@
   <depend>geographic_msgs</depend>
   <depend>nav_core</depend>
   <depend>nav_msgs</depend>
-  <depend>path_planner_common</depend>
+  <depend>alex_path_planner_common</depend>
   <depend>project11</depend>
   <depend>project11_navigation</depend>
   <depend>roscpp</depend>

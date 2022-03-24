@@ -1,5 +1,5 @@
 #include <ros/ros.h>
-#include <path_planner_common/UpdateReferenceTrajectory.h>
+#include <alex_path_planner_common/UpdateReferenceTrajectory.h>
 #include <actionlib/client/simple_action_client.h>
 #include <path_follower/path_followerAction.h>
 #include "project11/tf2_utils.h"
@@ -55,7 +55,7 @@ public:
         
     }
 
-    bool updateReferenceTrajectory(path_planner_common::UpdateReferenceTrajectory::Request &req, path_planner_common::UpdateReferenceTrajectory::Response &res)
+    bool updateReferenceTrajectory(alex_path_planner_common::UpdateReferenceTrajectory::Request &req, alex_path_planner_common::UpdateReferenceTrajectory::Response &res)
     {
         ROS_DEBUG_STREAM("Got " << req.plan.paths.size() << " dubins paths");
         
