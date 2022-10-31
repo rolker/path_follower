@@ -33,7 +33,7 @@ void PathFollowerPlugin::updateTask()
       if(!current_task_->done())
       {
         auto caps = context_->getRobotCapabilities();
-        ROS_INFO_STREAM("setting speed to: " << caps.default_velocity.linear.x);
+        //ROS_INFO_STREAM("setting speed to: " << caps.default_velocity.linear.x);
         PathFollower::setGoal(current_task_->message().poses, caps.default_velocity.linear.x);
       }
       else
