@@ -32,9 +32,12 @@ void PathFollowerPlugin::updateTask()
     {
       if(!current_task_->done())
       {
-        auto caps = context_->getRobotCapabilities();
-        //ROS_INFO_STREAM("setting speed to: " << caps.default_velocity.linear.x);
-        PathFollower::setGoal(current_task_->message().poses, caps.default_velocity.linear.x);
+        double speed = 0.0;
+        const auto& poses = current_task_->message().poses;
+        if(poses.empty() || poses.front().header.stamp.isZero() || poses.back().header.stamp <= poses.front().header.stamp)
+          speed = context_->getRobotCapabilities().default_velocity.linear.x;
+
+        PathFollower::setGoal(current_task_->message().poses, speed);
       }
       else
       {
