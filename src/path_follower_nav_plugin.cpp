@@ -49,7 +49,10 @@ void PathFollowerPlugin::updateTask()
 
   }
   else
+  {
+    PathFollower::setGoal(std::vector<geometry_msgs::PoseStamped>());
     updateDisplay();
+  }
 }
 
 bool PathFollowerPlugin::running()
