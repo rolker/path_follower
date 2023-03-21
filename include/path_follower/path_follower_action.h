@@ -5,7 +5,7 @@
 #include "path_follower/path_followerAction.h"
 #include "actionlib/server/simple_action_server.h"
 
-class PathFollowerAction: public PathFollower
+class PathFollowerAction: public path_follower::PathFollower
 {
 public:
   PathFollowerAction(std::string name);

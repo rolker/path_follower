@@ -7,7 +7,7 @@
 namespace path_follower_planner
 {
 
-class PathFollowerPlugin: public nav_core::BaseLocalPlanner, public PathFollower
+class PathFollowerPlugin: public nav_core::BaseLocalPlanner, public path_follower::PathFollower
 {
 public:
   bool computeVelocityCommands(geometry_msgs::Twist &cmd_vel) override;

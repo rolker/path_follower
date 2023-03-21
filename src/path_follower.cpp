@@ -26,6 +26,9 @@
 
 namespace p11 = project11;
 
+namespace path_follower
+{
+
 PathFollower::PathFollower():
   m_goal_speed(0.0),
   m_crab_angle(0.0),
@@ -414,4 +417,4 @@ void PathFollower::sendDisplay(bool dim)
     this->display_pub_.publish(this->vis_display_);
 }
 
-
+} // namespace path_follower

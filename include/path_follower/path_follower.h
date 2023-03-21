@@ -36,6 +36,9 @@
 
 namespace p11 = project11;
 
+namespace path_follower
+{
+
 class PathFollower
 {
 public:
@@ -105,5 +108,7 @@ private:
   ros::Publisher display_pub_;
 
 };
+
+} // namespace path_follower
 
 #endif
