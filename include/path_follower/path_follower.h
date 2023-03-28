@@ -19,8 +19,8 @@
  * 
  *
  */
-#ifndef PATH_FOLLOWER_NODE_H_
-#define PATH_FOLLOWER_NODE_H_
+#ifndef PATH_FOLLOWER_H
+#define PATH_FOLLOWER_H
 
 #include <vector>
 #include <cmath>
@@ -33,23 +33,24 @@
 #include "project11/utils.h"
 #include "project11/tf2_utils.h"
 #include "project11/pid.h"
+#include <project11_navigation/interfaces/task_to_twist_workflow.h>
 
 namespace p11 = project11;
 
 namespace path_follower
 {
 
-class PathFollower
+class PathFollowerPlugin: public project11_navigation::TaskToTwistWorkflow
 {
 public:
-  
-  PathFollower();
-  ~PathFollower();
+  void configure(std::string name, project11_navigation::Context::Ptr context) override;
+  void setGoal(const std::shared_ptr<project11_navigation::Task>& input) override;
+  bool running() override;
+  bool getResult(geometry_msgs::TwistStamped& output) override;
 
-protected:
-  void initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_private, const tf2_ros::Buffer *tf);
-  bool generateCommands(geometry_msgs::Twist &cmd_vel);
-  void setGoal(const std::vector< geometry_msgs::PoseStamped > & 	plan, double speed=0.0);
+private:
+  void updateTask();
+  void clear();
   double crossTrackError() const;
   double progress() const;
   bool goalReached() const;
@@ -57,20 +58,22 @@ protected:
   void updateDisplay();
   void sendDisplay(bool dim=false);
 
-  std::string m_base_frame;
   geographic_visualization_msgs::GeoVizItem vis_display_;
 
   const tf2_ros::Buffer *m_tf_buffer = nullptr;
-private:
+  project11_navigation::Context::Ptr context_;
+  std::shared_ptr<project11_navigation::Task> current_task_;
+  ros::Time task_update_time_;
+  std::string map_frame_;
 
   // Dynamics mode
   enum DynamicsMode { unicycle, holonomic };
-  DynamicsMode m_dynamics_mode;
+  DynamicsMode m_dynamics_mode = DynamicsMode::unicycle;
 
   /**
    * @brief Converts string (from ROS parameter) to mode enumeration.
    */
-  PathFollower::DynamicsMode str2dynamicsmode(std::string str);
+  DynamicsMode str2dynamicsmode(std::string str);
 
 
   /** @brief Holds the path bearing [rad, ENU] and distance [m] values. **/
@@ -85,22 +88,22 @@ private:
   std::vector<AzimuthDistance> m_segment_azimuth_distances;
 
 
-  float m_kp_yaw;
-  float m_kp_surge;
-  float m_kp_sway;
-  bool m_turn_in_place;
-  float m_turn_in_place_threshold;
+  float m_kp_yaw = 1.0;
+  float m_kp_surge = 0.1;
+  float m_kp_sway = 0.1;
+  bool m_turn_in_place = true;
+  float m_turn_in_place_threshold = 20.0;
   
-  int m_current_segment_index;
+  int m_current_segment_index = 0;
 
-  double m_goal_speed;
+  double m_goal_speed = 0.0;
 
-  p11::AngleRadians m_crab_angle;
+  p11::AngleRadians m_crab_angle = 0.0; // Steering angle correction to correct for external forces
     
-  double m_total_distance; // total distance of complete path in meters.
-  double m_cumulative_distance; // distance of completed segments in meters.
-  double m_current_segment_progress; // distance of completed progress for current segment in meters.
-  double m_cross_track_error; // cross-track distance in meters. 
+  double m_total_distance = 0.0; // total distance of complete path in meters.
+  double m_cumulative_distance = 0.0; // distance of completed segments in meters.
+  double m_current_segment_progress = 0.0; // distance of completed progress for current segment in meters.
+  double m_cross_track_error = 0.0; // cross-track distance in meters. 
 
   p11::PID m_pid;
   

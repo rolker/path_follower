@@ -1,7 +1,7 @@
 <library path="lib/libpath_follower_plugin">
-  <class name="path_follower/PathFollowerPlanner" type="path_follower_planner::PathFollowerPlugin" base_class_type="nav_core::BaseLocalPlanner">
+  <class name="path_follower/PathFollower" type="path_follower::PathFollowerPlugin" base_class_type="project11_navigation::TaskToTwistWorkflow">
     <description>
-      A local planner that follows a path minimizing cross-track error.
+      A controller that follows a path minimizing cross-track error.
     </description>
   </class>
 </library>

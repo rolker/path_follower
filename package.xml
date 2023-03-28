@@ -23,7 +23,6 @@
   <depend>roscpp</depend>
   
   <export>
-    <nav_core plugin="${prefix}/path_follower_plugin.xml"/>
-    <project11_navigation plugin="${prefix}/path_follower_nav_plugin.xml"/>
+    <project11_navigation plugin="${prefix}/path_follower_plugin.xml"/>
   </export>
 </package>
