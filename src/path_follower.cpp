@@ -266,11 +266,11 @@ bool PathFollowerPlugin::getResult(geometry_msgs::TwistStamped& output)
       {
         auto dt = segment_end_time - segment_start_time;
         target_speed = current_segment_distance/dt.toSec();
-        ROS_INFO_STREAM_THROTTLE(0.5, "default speed: " << m_goal_speed << " target speed: " << target_speed);
+        //ROS_INFO_STREAM_THROTTLE(0.5, "default speed: " << m_goal_speed << " target speed: " << target_speed);
       }
 
       double cos_crab = std::max(cos(m_crab_angle), 0.5);
-      ROS_INFO_STREAM_THROTTLE(0.5, "target speed along track: " << target_speed << " accounting for crab: " << target_speed/cos_crab << " cos crab: " << cos_crab);
+      //ROS_INFO_STREAM_THROTTLE(0.5, "target speed along track: " << target_speed << " accounting for crab: " << target_speed/cos_crab << " cos crab: " << cos_crab);
 
       output.twist.linear.x = target_speed/cos_crab;
       sendDisplay();
