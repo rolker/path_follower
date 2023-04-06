@@ -4,7 +4,6 @@ project(path_follower)
 add_compile_options(-std=c++11)
 
 find_package(catkin REQUIRED COMPONENTS
-  dubins_curves
   geographic_visualization_msgs
   geometry_msgs
   geographic_msgs
