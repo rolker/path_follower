@@ -75,7 +75,7 @@ PathFollowerPlugin::DynamicsMode PathFollowerPlugin::str2dynamicsmode(std::strin
   return DynamicsMode::unicycle;
 }
 
-void PathFollowerPlugin::setGoal(const std::shared_ptr<project11_navigation::Task>& input)
+void PathFollowerPlugin::setGoal(const project11_navigation::Task::Ptr& input)
 {
   if(current_task_ != input)
     task_update_time_ = ros::Time();
@@ -93,9 +93,20 @@ void PathFollowerPlugin::updateTask()
       if(!current_task_->done())
       {
         m_goal_speed = context_->getRobotCapabilities().default_velocity.linear.x;
-        auto data = current_task_->data();
-        if(data["speed"])
-          m_goal_speed = data["speed"].as<double>();
+        auto speed_item = current_task_->dataItem("speed");
+        try
+        {
+          m_goal_speed = speed_item.as<double>();
+        }
+        catch(const std::exception& e)
+        {
+        }
+        
+        if(speed_item.IsDefined())
+        // auto data = current_task_->data();
+        // if(data["speed"])
+        //   m_goal_speed = data["speed"].as<double>();
+        ROS_INFO_STREAM("speed: " << m_goal_speed);
         m_goal_path = current_task_->message().poses;
         for(int i = 0; i+1 < m_goal_path.size(); i++)
         {
