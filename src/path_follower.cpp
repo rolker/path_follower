@@ -306,7 +306,7 @@ bool PathFollowerPlugin::getResult(geometry_msgs::TwistStamped& output)
       double dist_goal = sqrt(dx_goal * dx_goal + dy_goal * dy_goal);
       output.twist.linear.x = std::min(this->m_kp_surge * dist_goal,
             this->m_goal_speed);
-      // Sway: Proporational to cross track error
+      // Sway: Proportional to cross track error
       output.twist.linear.y = 1.0 * std::copysign(this->m_kp_sway * m_cross_track_error,
                   error_azimuth.value());
 
