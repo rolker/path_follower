@@ -106,7 +106,7 @@ void PathFollowerPlugin::updateTask()
         // auto data = current_task_->data();
         // if(data["speed"])
         //   m_goal_speed = data["speed"].as<double>();
-        ROS_INFO_STREAM("speed: " << m_goal_speed);
+        ROS_DEBUG_STREAM("speed: " << m_goal_speed);
         m_goal_path = current_task_->message().poses;
         for(int i = 0; i+1 < m_goal_path.size(); i++)
         {
