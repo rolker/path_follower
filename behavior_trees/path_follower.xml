@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="FollowPath">
+    <ReactiveSequence>
+      <UpdateCurrentSegment navigation_path="{navigation_path}"
+                            odometry="{odometry}"
+                            tf_buffer="{tf_buffer}"
+                            current_segment="{current_navigation_segment}"
+                            segment_length="{current_segment_length}"
+                            cross_track_error="{current_segment_cross_track_error}"
+                            along_track_progress="{current_segment_along_track_progress}"
+                            segment_count="{navigation_path_segment_count}"/>
+      <VisualizeTrajectory trajectory="{navigation_path}"
+                           marker_array="{marker_array}"
+                           namespace="transit"
+                           scale="1.0"
+                           past_color=".25, .25, .25, .5"
+                           current_color=".35, .35, .5, .75"
+                           future_color=".25, .25, .4, .5"
+                           current_segment="{current_navigation_segment}"
+                           current_pose="{current_pose}"/>
+      <FollowPathCommand command_velocity="{command_velocity}"
+                         navigation_path="{navigation_path}"
+                         tf_buffer="{tf_buffer}"
+                         pid="{path_follower_pid}"
+                         odometry="{odometry}"
+                         current_navigation_segment="{current_navigation_segment}"
+                         target_speed="{target_speed}"/>
+    </ReactiveSequence>
+  </BehaviorTree>
+
+  <!-- Description of Node Models (used by Groot) -->
+  <TreeNodesModel>
+    <Action ID="FollowPathCommand"
+            editable="true">
+      <output_port name="command_velocity"
+                   default="{command_velocity}"/>
+      <input_port name="navigation_path"
+                  default="{navigation_path}"/>
+      <input_port name="tf_buffer"
+                  default="{tf_buffer}"/>
+      <inout_port name="pid"
+                  default="{path_follower_pid}"/>
+      <input_port name="odometry"
+                  default="{odometry}"/>
+      <input_port name="current_navigation_segment"
+                  default="{current_navigation_segment}"/>
+      <input_port name="target_speed"
+                  default="{target_speed}"/>
+    </Action>
+    <Action ID="UpdateCurrentSegment"
+            editable="true">
+      <input_port name="navigation_path"
+                  default="{navigation_path}"/>
+      <input_port name="odometry"
+                  default="{odometry}"/>
+      <input_port name="tf_buffer"
+                  default="{tf_buffer}"/>
+      <inout_port name="current_segment"
+                  default="{current_navigation_segment}"/>
+      <output_port name="segment_length"
+                   default="{current_segment_length}"/>
+      <output_port name="cross_track_error"
+                   default="{current_segment_cross_track_error}"/>
+      <output_port name="along_track_progress"
+                   default="{current_segment_along_track_progress}"/>
+      <output_port name="segment_count"
+                   default="{navigation_path_segment_count}"/>
+    </Action>
+    <Action ID="VisualizeTrajectory"
+            editable="true">
+      <input_port name="trajectory"
+                  default="{navigation_trajectory}">Pointer to a vector of PoseStamped</input_port>
+      <inout_port name="marker_array"
+                  default="{marker_array}">Pointer to a MarkerArray</inout_port>
+      <input_port name="namespace"
+                  default="trajectory">Used in ns field of Markers</input_port>
+      <input_port name="scale"
+                  default="1.0">Display size</input_port>
+      <input_port name="past_color"
+                  default=".25, .25, .25, .5">Color for past segments</input_port>
+      <input_port name="current_color"
+                  default=".35, .35, .5, .75">Color for current segment</input_port>
+      <input_port name="future_color"
+                  default=".25, .25, .4, .5">Color for future segments</input_port>
+      <input_port name="current_segment"
+                  default="{current_navigation_segment}">Index of the current segment</input_port>
+      <input_port name="current_pose"
+                  default="{current_pose}"/>
+    </Action>
+  </TreeNodesModel>
+
+</root>

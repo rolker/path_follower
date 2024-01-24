@@ -44,7 +44,7 @@ class PathFollowerPlugin: public project11_navigation::TaskToTwistWorkflow
 {
 public:
   void configure(std::string name, project11_navigation::Context::Ptr context) override;
-  void setGoal(const project11_navigation::Task::Ptr& input) override;
+  void setGoal(const project11_navigation::TaskPtr& input) override;
   bool running() override;
   bool getResult(geometry_msgs::TwistStamped& output) override;
 
@@ -60,9 +60,9 @@ private:
 
   geographic_visualization_msgs::GeoVizItem vis_display_;
 
-  const tf2_ros::Buffer *m_tf_buffer = nullptr;
+  std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   project11_navigation::Context::Ptr context_;
-  project11_navigation::Task::Ptr current_task_;
+  project11_navigation::TaskPtr current_task_;
   ros::Time task_update_time_;
   std::string map_frame_;
 

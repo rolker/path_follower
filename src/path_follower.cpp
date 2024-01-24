@@ -20,6 +20,7 @@
 
 #include "path_follower/path_follower.h"
 #include <pluginlib/class_list_macros.h>
+#include <project11_navigation/robot_capabilities.h>
 
 PLUGINLIB_EXPORT_CLASS(path_follower::PathFollowerPlugin, project11_navigation::TaskToTwistWorkflow)
 
@@ -33,7 +34,7 @@ void PathFollowerPlugin::configure(std::string name, project11_navigation::Conte
   context_ = context;
   ros::NodeHandle nh;
   ros::NodeHandle private_nh("~/" + name);
-  m_tf_buffer = &context_->tfBuffer();
+  tf_buffer_ = context_->tfBuffer();
   // Initiate node and get parameters.
 
   std::string dyn_mode_str;
@@ -75,7 +76,7 @@ PathFollowerPlugin::DynamicsMode PathFollowerPlugin::str2dynamicsmode(std::strin
   return DynamicsMode::unicycle;
 }
 
-void PathFollowerPlugin::setGoal(const project11_navigation::Task::Ptr& input)
+void PathFollowerPlugin::setGoal(const project11_navigation::TaskPtr& input)
 {
   if(current_task_ != input)
     task_update_time_ = ros::Time();
@@ -92,7 +93,8 @@ void PathFollowerPlugin::updateTask()
       clear();
       if(!current_task_->done())
       {
-        m_goal_speed = context_->getRobotCapabilities().default_velocity.linear.x;
+        ros::NodeHandle nh("~");
+        m_goal_speed = project11_navigation::RobotCapabilities(nh).default_velocity.linear.x;
         auto speed_item = current_task_->dataItem("speed");
         try
         {
@@ -160,7 +162,7 @@ bool PathFollowerPlugin::getResult(geometry_msgs::TwistStamped& output)
     geometry_msgs::TransformStamped base_to_map;
     try
     {
-      base_to_map = this->m_tf_buffer->lookupTransform(
+      base_to_map = this->tf_buffer_->lookupTransform(
         m_goal_path[0].header.frame_id, base_frame, ros::Time(0));
     }
     catch (tf2::TransformException &ex)
@@ -363,11 +365,11 @@ double PathFollowerPlugin::distanceRemaining() const
 void PathFollowerPlugin::updateDisplay()
 {
   vis_display_.lines.clear();
-  if(!m_goal_path.empty() and m_tf_buffer)
+  if(!m_goal_path.empty() and tf_buffer_)
   {
     try
     {
-      geometry_msgs::TransformStamped map_to_earth = m_tf_buffer->lookupTransform("earth", m_goal_path.front().header.frame_id, ros::Time(0));
+      geometry_msgs::TransformStamped map_to_earth = tf_buffer_->lookupTransform("earth", m_goal_path.front().header.frame_id, ros::Time(0));
 
       geographic_visualization_msgs::GeoVizPointList gvpl;
 
